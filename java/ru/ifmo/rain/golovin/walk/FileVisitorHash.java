@@ -50,7 +50,7 @@ public class FileVisitorHash extends SimpleFileVisitor<Path> {
         try {
             writer.write(String.format("%08X", 0).toLowerCase() + " " + file.toString());
             writer.newLine();
-            System.out.println("Open or read file error");
+            System.out.println("Open or read error with file \"" + file.toString() + "\"");
         } catch (IOException ignore) {
 
         }
