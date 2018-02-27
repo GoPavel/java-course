@@ -28,10 +28,12 @@ public class RecursiveWalk {
                                 Files.walkFileTree(path, new FileVisitorHash(writer, path.toString()));
                             } catch (InvalidPathException e) {
                                 writer.write(String.format("%08X", 0).toLowerCase() + " " + pathname);
-                                System.out.println("Invalid path exception during access to starting path for walking. message: "  + "\"" + e.getMessage() + "\"");
+                                System.out.println("Invalid path exception during access to starting path for walking. Assumed that it's a file and wrote null-hash for this path.");
+                                System.out.println("Exception message:"  + "\"" + e.getMessage() + "\"");
                             } catch (SecurityException e) {
                                 writer.write(String.format("%08X", 0).toLowerCase() + " " + pathname);
-                                System.out.println("Security exception during access to starting path for walking. message: "  + "\"" + e.getMessage() + "\"");
+                                System.out.println("Security exception during access to starting path for walking. Assumed that it's a file and wrote null-hash for this path.");
+                                System.out.println("Exception message:"  + "\"" + e.getMessage() + "\"");
                             } catch (IOException e) {
                                 System.out.println("I/O exception during walk. message: " + "\"" + e.getMessage() + "\"");
                             }
