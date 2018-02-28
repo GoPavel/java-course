@@ -13,7 +13,7 @@ public class FileVisitorHash extends SimpleFileVisitor<Path> {
     BufferedWriter writer;
     String namePathOfWriter;
     int sizeBuffer = 1024;
-    byte[] buffer  = new byte[sizeBuffer];
+    byte[] buffer = new byte[sizeBuffer];
 
 
     public FileVisitorHash(BufferedWriter writer, String namePathOfWriter) {
@@ -69,14 +69,15 @@ public class FileVisitorHash extends SimpleFileVisitor<Path> {
     public FileVisitResult visitFileFailed(Path file, IOException exc) {
         writeHash(0, file);
         System.out.println("File " + "\"" + file.toString() + "\" " + "couldn't be visit with I/O exception " + "\"" + exc.getClass().getCanonicalName() + "\" " +
-            "when walk in path " + "\"" + namePathOfWriter + "\".");
+                "when walk in path " + "\"" + namePathOfWriter + "\".");
         System.out.println("Exception message: " + exc.getMessage());
         return FileVisitResult.CONTINUE;
     }
 
     /*
-    * Note: Как можно обрабытывать исключения, которые нам приходят как параметры? Нужно ли пытаться найти динамический тип?
-    * Ведь специфицировать статический исключения при передачи его как параметр невозможно.
+     * Note: Как можно обрабытывать исключения, которые нам приходят как параметры? Нужно ли пытаться найти динамический тип?
+     * Ведь специфицировать статический исключения при передачи его как параметр невозможно.
+     * if (instanceof)
      */
 
     @Override
@@ -85,7 +86,7 @@ public class FileVisitorHash extends SimpleFileVisitor<Path> {
             return FileVisitResult.CONTINUE;
         else {
             System.out.println("I/O exception " + "\"" + exc.getClass().getCanonicalName() + "\" " +
-                                "when walk in path " + "\"" + namePathOfWriter + "\" and iteration completed prematurely.");
+                    "when walk in path " + "\"" + namePathOfWriter + "\" and iteration completed prematurely.");
             System.out.println("Exception message: " + "\"" + exc.getMessage() + "\"");
             return FileVisitResult.CONTINUE;
         }
