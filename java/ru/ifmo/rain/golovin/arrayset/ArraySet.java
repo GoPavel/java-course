@@ -9,47 +9,53 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
 
 public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implements NavigableSet<E> {
-    private ArrayList<E> elements;
-    private Comparator<E> comparator;
+    private List<E> elements;
+    private Comparator<? super E> comparatorOfSet;
 
     public ArraySet() {
-        this.elements = new ArrayList<>();
-        this.comparator = Comparator.naturalOrder();
+        this(Collections.emptyList(), null);
     }
 
     public ArraySet(Collection<? extends E> c) {
+        this(c, Comparator.naturalOrder());
     }
 
     public ArraySet(Comparator<? super E> comparator) {
-        this.elements = new ArrayList<>();
-        this.comparator = Comparator.naturalOrder();
+        this(Collections.emptyList(), comparator);
     }
 
     public ArraySet(Collection<? extends E> c, Comparator<? super E> comparator) {
-        this.comparator = comparator;
-        ArrayList<? extends E> temp = new ArrayList<>(c);
-        temp.sort(comparator);
-
-        for (Iterator<? extends E> it = temp.iterator();;) {
-            E e = it.next();
+        comparatorOfSet = comparator == null ? Comparator.naturalOrder() : comparator;
+        Objects.requireNonNull(c); //TODO ask about with statement
+        if (!c.isEmpty()) {
+            ArrayList<? extends E> temp = new ArrayList<>(c);
+            temp.sort(comparator);
+            Iterator<? extends E> it = temp.iterator();
             elements.add(it.next());
+            while(it.hasNext()) {
+                E e = it.next();
+                if(comparator.compare(e, elements.get(elements.size()-1)) != 0) {
+                    elements.add(e);
+                }
+            }
+        } else {
+            elements = Collections.emptyList();
         }
-        //TODO
-
-        elements = new ArrayList<>( new HashSet<>(c));
-        elements.sort(Comparator.naturalOrder());
     }
 
     public ArraySet(Set<E> otherSet) {
-        //TODO
+        this(otherSet, Comparator.naturalOrder());
     }
 
-    private ArraySet(List<E> arr) {
-        elements = new ArrayList<>(arr);
+    private ArraySet(List<E> listView, Comparator<? super E> comparator) { // for create view
+        elements = listView;
+        comparatorOfSet = comparator;
     }
 
     @Override // from AbstractCollection
@@ -62,101 +68,127 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
         return Collections.unmodifiableCollection(elements).iterator();
     }
 
-//    @Override // for performance
-//    public boolean contains(Object o) {
-//        //TODO   return Collections.binarySearch(elements, (E    ) o) >= 0;
-//    }
-
+    @SuppressWarnings("UncheckedCast")
+    @Override // for performance
+    public boolean contains(Object o) {
+        return (Collections.binarySearch(elements, (E)o,comparatorOfSet) >= 0);
+        // TODO may be error with emtpyList
+    }
 
     @Override  //from SortedSet
     public Comparator<? super E> comparator() {
-        //TODO
+        return comparatorOfSet;
     }
 
 
     @Override //from SortedSet
     public E first() {
-        //TODO
+        return elements.get(0);
     }
 
     @Override //from SortedSet
     public E last() {
-        //TODO
+        return elements.get(elements.size() - 1);
+    }
+
+    private int ceilingIndex(E e) { // find >= e else size()
+        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        return index >= 0 ? index : (-index - 1);
+    }
+
+    private int floorIndex(E e) { //find <= e else -1
+        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        return index >= 0 ? index : (-index - 1) - 1;
+    }
+
+    private int higherIndex(E e) { // find > e else size()
+        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        return index >= 0 ? index+1 : (-index - 1);
+    }
+
+    private int lowerIndex(E e) { // find < e else -1
+        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        return index >= 0 ? index-1 : (-index - 1) - 1;
     }
 
     @Override
-    public E ceiling(E e) {
-        //TODO
+    public E ceiling(E e) { // find >= e else null
+        int index = ceilingIndex(e);
+        return index == elements.size() ? null : elements.get(index);
+    }
+
+    @Override //from NavigableSet
+    public E floor(E e) { // find <= e else null
+        int index = floorIndex(e);
+        return index == -1 ? null : elements.get(index);
+    }
+
+    @Override //from NavigableSet
+    public E higher(E e) { // ind > e else null
+        int index = higherIndex(e);
+        return (index == elements.size() ? null : elements.get(index));
+    }
+
+    @Override //from NavigableSet
+    public E lower(E e) { //find < e else null
+        int index = lowerIndex(e);
+        return index == -1 ? null : elements.get(index);
     }
 
     @Override //from NavigableSet
     public Iterator<E> descendingIterator() {
-        //TODO
+        //TODO read doc
     }
 
     @Override //from NavigableSet
     public NavigableSet<E> descendingSet() {
-        //TODO
-    }
-
-    @Override //from NavigableSet
-    public E floor(E e) {
-        //TODO
+        //TODO read doc
     }
 
     @Override //from NavigableSet
     public NavigableSet<E> headSet(E toElement) {
-        //TODO
+        return subSet(first(), true, toElement, false);
     }
 
     @Override //from NavigableSet
     public NavigableSet<E> headSet(E toElement, boolean inclusive) {
-        //TODO
-    }
-
-    @Override //from NavigableSet
-    public E higher(E e) {
-        //TODO
-    }
-
-    @Override //from NavigableSet
-    public E lower(E e) {
-        //TODO
+        return subSet(first(), true, toElement, inclusive);
     }
 
     @Override //from NavigableSet
     public E pollFirst() {
-        //TODO
+        throw new UnsupportedOperationException();
     }
-
     @Override //from NavigableSet
     public E pollLast() {
-        //TODO
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public NavigableSet<E> subSet(E formElement, E toElement) {
-        //TODO
+        return subSet(formElement, true, toElement, false);
     }
 
     @Override
     public NavigableSet<E> subSet(E fromElement, boolean fromInclusive, E toElement, boolean toInclusive) {
-        //TODO
+        if (comparatorOfSet.compare(fromElement, toElement) > 0)
+            throw new IllegalArgumentException("fromKey > toKey");
+        int fromIndex = fromInclusive ? ceilingIndex(fromElement) : higherIndex(fromElement); // [0..size()]
+        int toIndex = toInclusive ? floorIndex(toElement) : lowerIndex(toElement); // [-1..size()-1]
+        return new ArraySet<>(elements.subList(fromIndex, toIndex + 1), comparatorOfSet); // fromIndex -- inclusive, toIndex -- exclusive
     }
-
 
     @Override
     public NavigableSet<E> tailSet(E fromElement) {
-        //TODO
+        return subSet(fromElement, false, last(), true);
     }
 
     @Override
     public NavigableSet<E> tailSet(E fromElement, boolean inclusive) {
-        //TODO
+        return subSet(fromElement, false, last(), inclusive);
     }
 }
 
-///TODO
-////  сразу реализовывать навигейт
-//// подумать над ошибками приведения
-//// подумать над скоростью.
+//TODO
+// +- null check
+// +- outOfBoundExc
