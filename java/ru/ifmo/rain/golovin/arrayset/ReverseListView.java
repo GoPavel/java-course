@@ -5,10 +5,21 @@ import java.util.AbstractSet;
 import java.util.List;
 
 public class ReverseListView<E> extends AbstractList<E> {
-    List<E> view;
+    private List<E> view;
+    private boolean reverseFlag;
 
     ReverseListView(List<E> otherList) {
         view = otherList;
+        reverseFlag = true;
+    }
+
+    ReverseListView(ReverseListView<E> otherList) {
+        view = otherList.view;
+        reverseFlag = !otherList.reverseFlag;
+    }
+
+    public void reverse() {
+        reverseFlag = !reverseFlag;
     }
 
     @Override
@@ -18,6 +29,6 @@ public class ReverseListView<E> extends AbstractList<E> {
 
     @Override
     public E get(int i) {
-        return view.get(view.size()-1 - i);
+        return reverseFlag ? view.get(view.size()-1 - i) : view.get(i);
     }
 }
