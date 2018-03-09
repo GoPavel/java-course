@@ -35,7 +35,7 @@ public class RecursiveWalk {
                             writer.write(String.format("%08X", 0).toLowerCase() + " " + pathname);
                             error("Security exception during access to starting path for walking. Assumed that it's a file and wrote null-hash for this path.", e);
                         } catch (IOException e) {
-                            error("I/O exception during walk. message: ", e);
+                            error("I/O exception during walk.", e);
                         }
                     }
                 } catch (FileNotFoundException e) {
@@ -45,12 +45,12 @@ public class RecursiveWalk {
                 } catch (UnsupportedEncodingException e) {
                     error("Output file is not supported charset \"UTF8\". Caught unsupported encoding exception.", e);
                 } catch (IOException e) {
-                    error("I/O exception during close output file. message: ", e);
+                    error("I/O exception during close output file.", e);
                 }
             } catch (FileNotFoundException e) {
                 error("Input file not found. Caught file not found exception.", e);
             } catch (SecurityException e) {
-                error("Security exception during open input file. message: ", e);
+                error("Security exception during open input file.", e);
             } catch (UnsupportedEncodingException e) {
                 error("Input file is not supported charset \"UTF8\". Caught unsupported encoding exception.", e);
             } catch (IOException e) {
