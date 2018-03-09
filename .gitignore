@@ -4,3 +4,4 @@ out/*
 __Test__Walk__/*
 java/ru/ifmo/rain/golovin/walk/Sss.java
 **/testing.java
+*.class

@@ -9,17 +9,13 @@ public class ReverseListView<E> extends AbstractList<E> {
     private boolean reverseFlag;
 
     ReverseListView(List<E> otherList) {
-        view = otherList;
-        reverseFlag = true;
-    }
-
-    ReverseListView(ReverseListView<E> otherList) {
-        view = otherList.view;
-        reverseFlag = !otherList.reverseFlag;
-    }
-
-    public void reverse() {
-        reverseFlag = !reverseFlag;
+        if (otherList instanceof ReverseListView) {
+            view = ((ReverseListView) otherList).view;
+            reverseFlag = ! ((ReverseListView) otherList).reverseFlag;
+        } else {
+            view = otherList;
+            reverseFlag = true;
+        }
     }
 
     @Override

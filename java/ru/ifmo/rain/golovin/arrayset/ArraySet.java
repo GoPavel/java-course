@@ -5,17 +5,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
-public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implements NavigableSet<E> {
+public class ArraySet<E extends Comparable<E>> extends AbstractSet<E> implements NavigableSet<E> {
     private List<E> elements;
     private Comparator<? super E> comparatorOfSet;
 
@@ -24,7 +21,7 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
     }
 
     public ArraySet(Collection<? extends E> c) {
-        this(c, Comparator.naturalOrder());
+        this(c, null);
     }
 
     public ArraySet(Comparator<? super E> comparator) {
@@ -32,17 +29,17 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
     }
 
     public ArraySet(Collection<? extends E> c, Comparator<? super E> comparator) {
-        comparatorOfSet = comparator == null ? Comparator.naturalOrder() : comparator;
-        Objects.requireNonNull(c); //TODO ask about with statement
+        comparatorOfSet = comparator;
+        Objects.requireNonNull(c);
         if (!c.isEmpty()) {
             ArrayList<? extends E> temp = new ArrayList<>(c);
-            temp.sort(comparator);
+            temp.sort(comparatorOfSet);
             Iterator<? extends E> it = temp.iterator();
             elements = new ArrayList<>();
             elements.add(it.next());
-            while(it.hasNext()) {
+            while (it.hasNext()) {
                 E e = it.next();
-                if(comparator.compare(e, elements.get(elements.size()-1)) != 0) {
+                if (compare(e, elements.get(elements.size() - 1)) != 0) {
                     elements.add(e);
                 }
             }
@@ -52,12 +49,16 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
     }
 
     public ArraySet(Set<E> otherSet) {
-        this(otherSet, Comparator.naturalOrder());
+        this(otherSet, null);
     }
 
     private ArraySet(List<E> listView, Comparator<? super E> comparator) { // for create view
         elements = listView;
         comparatorOfSet = comparator;
+    }
+
+    private int compare(E e1, E e2) {
+        return comparatorOfSet == null ? e1.compareTo(e2) : comparatorOfSet.compare(e1, e2);
     }
 
     @Override // from AbstractCollection
@@ -73,13 +74,13 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
     @SuppressWarnings("UncheckedCast")
     @Override // for performance
     public boolean contains(Object o) {
-        return (Collections.binarySearch(elements, (E)o,comparatorOfSet) >= 0);
+        return (Collections.binarySearch(elements, (E) o, comparatorOfSet) >= 0);
         // TODO may be error with emtpyList
     }
 
     @Override  //from SortedSet
     public Comparator<? super E> comparator() {
-        return comparatorOfSet == Comparator.naturalOrder()? null : comparatorOfSet;
+        return comparatorOfSet;
     }
 
 
@@ -97,24 +98,28 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
         return elements.get(elements.size() - 1);
     }
 
+    private int binarySearch(E e) {
+        return Collections.binarySearch(elements, e, comparatorOfSet);
+    }
+
     private int ceilingIndex(E e) { // find >= e else size()
-        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        int index = binarySearch(e);
         return index >= 0 ? index : (-index - 1);
     }
 
     private int floorIndex(E e) { //find <= e else -1
-        int index = Collections.binarySearch(elements, e, comparatorOfSet);
+        int index = binarySearch(e);
         return index >= 0 ? index : (-index - 1) - 1;
     }
 
     private int higherIndex(E e) { // find > e else size()
-        int index = Collections.binarySearch(elements, e, comparatorOfSet);
-        return index >= 0 ? index+1 : (-index - 1);
+        int index = binarySearch(e);
+        return index >= 0 ? index + 1 : (-index - 1);
     }
 
     private int lowerIndex(E e) { // find < e else -1
-        int index = Collections.binarySearch(elements, e, comparatorOfSet);
-        return index >= 0 ? index-1 : (-index - 1) - 1;
+        int index = binarySearch(e);
+        return index >= 0 ? index - 1 : (-index - 1) - 1;
     }
 
     @Override
@@ -148,7 +153,8 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
 
     @Override //from NavigableSet
     public NavigableSet<E> descendingSet() {
-        return new ArraySet<>(new ReverseListView<>(elements), comparatorOfSet.reversed());
+        Comparator<? super E> comp = comparatorOfSet == null ? Comparator.reverseOrder() : comparatorOfSet.reversed();
+        return new ArraySet<>(new ReverseListView<>(elements), comp);
     }
 
     @Override //from NavigableSet
@@ -156,7 +162,7 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
         Objects.requireNonNull(toElement);
         if (isEmpty())
             return new ArraySet<E>(Collections.emptyList(), comparatorOfSet);
-        return subSet(first(), true,  toElement, false);
+        return subSet(first(), true, toElement, false);
     }
 
     @Override //from NavigableSet
@@ -189,8 +195,8 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
         Objects.requireNonNull(fromElement);
         Objects.requireNonNull(toElement);
         if (isEmpty() ||
-                comparatorOfSet.compare(fromElement, toElement) > 0 ||
-                (comparatorOfSet.compare(fromElement, toElement) == 0 && (!fromInclusive || !toInclusive))) {
+                compare(fromElement, toElement) > 0 ||
+                (compare(fromElement, toElement) == 0 && (!fromInclusive || !toInclusive))) {
             return new ArraySet<E>(Collections.emptyList(), comparatorOfSet);
         }
         int fromIndex = fromInclusive ? ceilingIndex(fromElement) : higherIndex(fromElement); // [0..size()]
@@ -214,7 +220,3 @@ public class ArraySet<E extends Comparable<E> > extends AbstractSet<E> implement
         return subSet(fromElement, inclusive, last(), true);
     }
 }
-
-//TODO
-// +- null check
-// +- outOfBoundExcection
