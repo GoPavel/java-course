@@ -11,7 +11,7 @@ public class ReverseListView<E> extends AbstractList<E> {
     ReverseListView(List<E> otherList) {
         if (otherList instanceof ReverseListView) {
             view = ((ReverseListView) otherList).view;
-            reverseFlag = ! ((ReverseListView) otherList).reverseFlag;
+            reverseFlag = !((ReverseListView) otherList).reverseFlag;
         } else {
             view = otherList;
             reverseFlag = true;
@@ -25,6 +25,6 @@ public class ReverseListView<E> extends AbstractList<E> {
 
     @Override
     public E get(int i) {
-        return reverseFlag ? view.get(view.size()-1 - i) : view.get(i);
+        return reverseFlag ? view.get(view.size() - 1 - i) : view.get(i);
     }
 }

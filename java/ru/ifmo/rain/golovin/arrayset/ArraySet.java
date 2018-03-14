@@ -12,7 +12,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 
-public class ArraySet<E extends Comparable<E>> extends AbstractSet<E> implements NavigableSet<E> {
+public class ArraySet<E> extends AbstractSet<E> implements NavigableSet<E> {
     private List<E> elements;
     private Comparator<? super E> comparatorOfSet;
 
@@ -58,7 +58,12 @@ public class ArraySet<E extends Comparable<E>> extends AbstractSet<E> implements
     }
 
     private int compare(E e1, E e2) {
-        return comparatorOfSet == null ? e1.compareTo(e2) : comparatorOfSet.compare(e1, e2);
+        if (e1 instanceof Comparable && e2 instanceof Comparable) {
+//            return comparatorOfSet == null ? Comparator.<Comparable>naturalOrder().compare((Comparable)e1, (Comparable)e2) : comparatorOfSet.compare(e1, e2);
+            return comparatorOfSet == null ? ((Comparable)e1).compareTo((Comparable)(e2)) : comparatorOfSet.compare(e1, e2);
+        } else {
+            throw new ClassCastException("E isn't Comparable, then it haven't natural order. Please, use custom comparator");
+        }
     }
 
     @Override // from AbstractCollection
@@ -75,7 +80,6 @@ public class ArraySet<E extends Comparable<E>> extends AbstractSet<E> implements
     @Override // for performance
     public boolean contains(Object o) {
         return (Collections.binarySearch(elements, (E) o, comparatorOfSet) >= 0);
-        // TODO may be error with emtpyList
     }
 
     @Override  //from SortedSet
@@ -153,8 +157,7 @@ public class ArraySet<E extends Comparable<E>> extends AbstractSet<E> implements
 
     @Override //from NavigableSet
     public NavigableSet<E> descendingSet() {
-        Comparator<? super E> comp = comparatorOfSet == null ? Comparator.reverseOrder() : comparatorOfSet.reversed();
-        return new ArraySet<>(new ReverseListView<>(elements), comp);
+        return new ArraySet<>(new ReverseListView<>(elements), Collections.reverseOrder(comparatorOfSet));
     }
 
     @Override //from NavigableSet
