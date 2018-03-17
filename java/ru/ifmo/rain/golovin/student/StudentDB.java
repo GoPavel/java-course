@@ -3,27 +3,21 @@ package ru.ifmo.rain.golovin.student;
 import info.kgeorgiy.java.advanced.student.Group;
 import info.kgeorgiy.java.advanced.student.Student;
 import info.kgeorgiy.java.advanced.student.StudentGroupQuery;
-import info.kgeorgiy.java.advanced.student.StudentQuery;
-import org.jsoup.select.Collector;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class StudentDB implements StudentGroupQuery {
+
+    // simple map methods
 
     private List<String> getSomething(final List<Student> students, Function<Student, String> mapFunc) {
         return students.stream()
@@ -63,30 +57,8 @@ public class StudentDB implements StudentGroupQuery {
         return getSomething(students, student -> student.getFirstName() + " " + student.getLastName());
     }
 
-    //-------------------------------------------------------------------
 
-    /**
-     * Returns distinct student {@link Student#getFirstName() first names} in alphabetical order.
-     */
-    @Override
-    public Set<String> getDistinctFirstNames(final List<Student> students) {
-        return students.stream()
-                .map(Student::getFirstName)
-                .collect(Collectors.toCollection(TreeSet::new));
-    }
-
-    /**
-     * Returns name of the student with minimal {@link Student#getId() id}.
-     */
-    @Override
-    public String getMinStudentFirstName(final List<Student> students) {
-        return students.stream()
-                .min(Comparator.comparing(Student::getId))
-                .map(Student::getFirstName)
-                .orElse("");
-    }
-
-    //--------------------------------------------------------------------------
+    // sorted methods
 
     private List<Student> sortStudentsBy(Collection<Student> students, Comparator<Student> comparator) {
         return students.stream()
@@ -113,7 +85,7 @@ public class StudentDB implements StudentGroupQuery {
         return sortStudentsBy(students, comparatorByName);
     }
 
-    //--------------------------------------------------------------------------
+    // find methods
 
     private Comparator<Student> comparatorByName =
             Comparator.comparing(Student::getLastName)
@@ -150,24 +122,16 @@ public class StudentDB implements StudentGroupQuery {
     public List<Student> findStudentsByGroup(Collection<Student> students, String group) {
         return findStudentBy(students, Student::getGroup, group);
     }
-    //--------------------------------------------------------------------------
 
-    /**
-     * Returns map of group's student last names mapped to minimal first name.
-     */
-    @Override
-    public Map<String, String> findStudentNamesByGroup(final Collection<Student> students, final String group) {
-        return students.stream()
-                .filter(student -> student.getGroup().equals(group))
-                .collect(Collectors.toMap(Student::getLastName, Student::getFirstName, BinaryOperator.minBy(String::compareTo)));
-    }
-
-    //-------------------------------------------------------------------------
-
-    private List<Group> getGoupsBy(Collection<Student> students, Comparator<Student> comparator) {
+    // group's methods
+    private Stream<Map.Entry<String, List<Student>>> getGroupEntryStream(Collection<Student> students) {
         return students.stream()
                 .collect(Collectors.groupingBy(Student::getGroup))
-                .entrySet().stream()
+                .entrySet().stream();
+    }
+
+    private List<Group> getGoupsBy(Collection<Student> students, Comparator<Student> comparator) {
+        return getGroupEntryStream(students)
                 .map(mapEntry -> new Group(mapEntry.getKey(), sortStudentsBy(mapEntry.getValue(), comparator)))
                 .sorted(Comparator.comparing(Group::getName))
                 .collect(Collectors.toList());
@@ -186,9 +150,15 @@ public class StudentDB implements StudentGroupQuery {
      */
     @Override
     public List<Group> getGroupsById(Collection<Student> students) {
-        return getGoupsBy(students, comparatorByName);
+        return getGoupsBy(students, Comparator.comparing(Student::getId));
     }
 
+    private String getLargestGroupBy(Collection<Student> students, Comparator<Group> comparator) {
+        return getGroupEntryStream(students)
+                .map(entry -> new Group(entry.getKey(), entry.getValue()))
+                .max(comparator)
+                .map(Group::getName).orElse("");
+    }
 
     /**
      * Returns name of the group containing maximum number of students.
@@ -196,13 +166,8 @@ public class StudentDB implements StudentGroupQuery {
      */
     @Override
     public String getLargestGroup(Collection<Student> students) {
-        students.stream()
-                .collect(Collectors.groupingBy(Student::getGroup))
-                .entrySet().stream()
-                .map(mapEntry -> new Group(mapEntry.getKey(), mapEntry.getValue()))
-                .sorted(Comparator.comparing(Group::getName))
-                .max(Comparator.comparingInt(group -> group.getStudents().size()))
-
+        return getLargestGroupBy(students, Comparator.<Group, Integer>comparing(group -> group.getStudents().size())
+                .thenComparing(Comparator.comparing(Group::getName).reversed()));
     }
 
     /**
@@ -210,9 +175,42 @@ public class StudentDB implements StudentGroupQuery {
      * If there are more than one largest group, the one with smallest name is returned.
      */
     @Override
-    public String getLargestGroupFirstName(Collection<Student> students);
-    //TODO
+    public String getLargestGroupFirstName(Collection<Student> students) {
+        return getLargestGroupBy(students, Comparator.<Group, Integer>comparing(group -> getDistinctFirstNames(group.getStudents()).size())
+                .thenComparing(Comparator.comparing(Group::getName).reversed()));
+    }
+
+    // ...
+
+    /**
+     * Returns map of group's student last names mapped to minimal first name.
+     */
+    @Override
+    public Map<String, String> findStudentNamesByGroup(final Collection<Student> students, final String group) {
+        return students.stream()
+                .filter(student -> student.getGroup().equals(group))
+                .collect(Collectors.toMap(Student::getLastName, Student::getFirstName, BinaryOperator.minBy(String::compareTo)));
+    }
+
+    /**
+     * Returns distinct student {@link Student#getFirstName() first names} in alphabetical order.
+     */
+    @Override
+    public Set<String> getDistinctFirstNames(final List<Student> students) {
+        return students.stream()
+                .map(Student::getFirstName)
+                .collect(Collectors.toCollection(TreeSet::new));
+    }
+
+    /**
+     * Returns name of the student with minimal {@link Student#getId() id}.
+     */
+    @Override
+    public String getMinStudentFirstName(final List<Student> students) {
+        return students.stream()
+                .min(Comparator.comparing(Student::getId))
+                .map(Student::getFirstName)
+                .orElse("");
+    }
 }
-
-
 //NB почему методы не статические?
