@@ -82,12 +82,12 @@ public class StudentDB implements StudentGroupQuery {
      */
     @Override
     public List<Student> sortStudentsByName(Collection<Student> students) {
-        return sortStudentsBy(students, comparatorByName);
+        return sortStudentsBy(students, COMPARATOR_BY_NAME);
     }
 
     // find methods
 
-    private Comparator<Student> comparatorByName =
+    private static final Comparator<Student> COMPARATOR_BY_NAME =
             Comparator.comparing(Student::getLastName)
                     .thenComparing(Student::getFirstName)
                     .thenComparing(Student::getId);
@@ -95,7 +95,7 @@ public class StudentDB implements StudentGroupQuery {
     private List<Student> findStudentBy(Collection<Student> students, Function<Student, String> mapFunc, String name) {
         return students.stream()
                 .filter(student -> mapFunc.apply(student).equals(name))
-                .sorted(comparatorByName)
+                .sorted(COMPARATOR_BY_NAME)
                 .collect(Collectors.toList());
     }
 
@@ -130,7 +130,7 @@ public class StudentDB implements StudentGroupQuery {
                 .entrySet().stream();
     }
 
-    private List<Group> getGoupsBy(Collection<Student> students, Comparator<Student> comparator) {
+    private List<Group> getGroupsBy(Collection<Student> students, Comparator<Student> comparator) {
         return getGroupEntryStream(students)
                 .map(mapEntry -> new Group(mapEntry.getKey(), sortStudentsBy(mapEntry.getValue(), comparator)))
                 .sorted(Comparator.comparing(Group::getName))
@@ -142,7 +142,7 @@ public class StudentDB implements StudentGroupQuery {
      */
     @Override
     public List<Group> getGroupsByName(Collection<Student> students) {
-        return getGoupsBy(students, comparatorByName);
+        return getGroupsBy(students, COMPARATOR_BY_NAME);
     }
 
     /**
@@ -150,7 +150,7 @@ public class StudentDB implements StudentGroupQuery {
      */
     @Override
     public List<Group> getGroupsById(Collection<Student> students) {
-        return getGoupsBy(students, Comparator.comparing(Student::getId));
+        return getGroupsBy(students, Comparator.comparing(Student::getId));
     }
 
     private String getLargestGroupBy(Collection<Student> students, Comparator<Group> comparator) {
