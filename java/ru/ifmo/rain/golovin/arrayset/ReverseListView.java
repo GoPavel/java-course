@@ -10,7 +10,7 @@ public class ReverseListView<E> extends AbstractList<E> {
 
     ReverseListView(List<E> otherList) {
         if (otherList instanceof ReverseListView) {
-            view = ((ReverseListView) otherList).view;
+            view = ((ReverseListView<E>) otherList).view;
             reverseFlag = !((ReverseListView) otherList).reverseFlag;
         } else {
             view = otherList;
