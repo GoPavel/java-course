@@ -1,9 +1,10 @@
 package ru.ifmo.rain.golovin.implementor;
 
-import info.kgeorgiy.java.advanced.implementor.Impler;
 import info.kgeorgiy.java.advanced.implementor.ImplerException;
+import info.kgeorgiy.java.advanced.implementor.JarImpler;
 
-import javax.annotation.processing.Completion;
+import javax.tools.JavaCompiler;
+import javax.tools.ToolProvider;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,19 +17,18 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.jar.Attributes;
+import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
 
-public class Implementor implements Impler {
+public class Implementor implements JarImpler {
 
     private String getClassName(Class<?> aClass) {
         return aClass.getSimpleName() + "Impl";
@@ -157,8 +157,10 @@ public class Implementor implements Impler {
      */
     @Override
     public void implement(Class<?> token, Path root) throws ImplerException {
-        Objects.requireNonNull(token);
-        Objects.requireNonNull(root);
+        if (token == null || root == null) {
+            throw new ImplerException("Require not null argument.");
+        }
+
         if (token.isPrimitive() || token.isArray() || Modifier.isFinal(token.getModifiers()) || token == Enum.class) {
             throw new ImplerException("Incorrect type");
         }
@@ -181,8 +183,12 @@ public class Implementor implements Impler {
         }
     }
 
+    private Path resolveFilePath(Path path, Class<?> aClass, String end) {
+        return path.resolve(aClass.getPackage().getName().replace('.', File.separatorChar) + end).resolve(getClassName(aClass) + end);
+    }
+
     private BufferedWriter createFile(Class<?> token, Path path) throws IOException {
-        Path pathFile = path.resolve(token.getCanonicalName().replace('.', File.separatorChar) + "Impl.java");
+        Path pathFile = resolveFilePath(path, token, ".java"); //  path.resolve(token.getCanonicalName().replace('.', File.separatorChar) + "Impl.java");
         Files.createDirectories(Objects.requireNonNull(pathFile.getParent()));
         Files.deleteIfExists(pathFile); //TODO
         Files.createFile(pathFile);
@@ -192,5 +198,122 @@ public class Implementor implements Impler {
 
     public static void main(String[] args) {
         //TODO4
+    }
+
+
+    /**
+     * Produces <tt>.jar</tt> file implementing class or interface specified by provided <tt>token</tt>.
+     * <p>
+     * Generated class full name should be same as full name of the type token with <tt>Impl</tt> suffix
+     * added.
+     *
+     * @param token type token to create implementation for.
+     * @param jarFile target <tt>.jar</tt> file.
+     * @throws ImplerException when implementation cannot be generated.@Override
+
+    */
+    @Override
+    public void implementJar(Class<?> token, Path jarFile) throws ImplerException {
+        if (token == null || jarFile == null) {
+            throw new ImplerException("Require not null argument.");
+        }
+
+//        if (token.isPrimitive() || token.isArray() || Modifier.isFinal(token.getModifiers())
+//                || token == Enum.class) {
+//            throw new ImplerException("Incorrect type");
+//        }
+
+        if (jarFile.getParent() != null) {
+            try {
+                Files.createDirectories(jarFile.getParent());
+            } catch (IOException e) {
+                throw new ImplerException("Problems with create directories for temp files.", e);
+            }
+        }
+
+        Path tempDir;
+        try {
+            tempDir = Files.createTempDirectory(jarFile.toAbsolutePath().getParent(), "temp");
+        }
+        catch (IOException e) {
+            throw new ImplerException("Problems with create temp directories.", e);
+        }
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        String[] args = new String[3];
+        args[0] = "-cp";
+        args[1] = tempDir.toString() + File.pathSeparator + System.getProperty("java.class.path");
+        args[2] = resolveFilePath(tempDir, token, ".java").toString();
+
+        Manifest manifest = new Manifest();
+        Attributes attributes = manifest.getMainAttributes();
+        attributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        attributes.put(Attributes.Name.IMPLEMENTATION_VENDOR, "Golovin Pavel");
+        try (JarOutputStream jarStream = new JarOutputStream(Files.newOutputStream(jarFile), manifest)) {
+            implement(token, tempDir);
+            if (compiler.run(null, null, null, args) != 0) {
+                throw new ImplerException("Problem with compile generative file.");
+            }
+            try {
+                jarStream.putNextEntry(new ZipEntry(token.getName().replace('.', '/') + "Impl.class"));
+                Files.copy(resolveFilePath(tempDir, token, ".class"), jarStream);
+            } catch (IOException e) {
+                throw new ImplerException("Problem with write to jar-file");
+            }
+        } catch(IOException e) {
+            throw new ImplerException("Problem with create jar-file" , e);
+        }
+        finally {
+            clean(tempDir);
+        }
+    }
+
+    private void clean(Path dir) {
+        Files.walkFileTree(dir, new Cleaner());
+    }
+
+    private static class Cleaner extends SimpleFileVisitor<Path> {
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+            File.delete(file);
+            return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            Files.delete(dir);
+            return FileVisitResult.CONTINUE;
+        }
+    }
+
+    public static void main(String[] args) {
+        if (args == null || (args.length != 2 && args.leght != 3)) {
+            System.out.println("Two or three arguments expected.");
+            return;
+        }
+        for (String arg: args) {
+            if (arg == null) {
+                System.out.println("expected non-null arguments.");
+            }
+        }
+        JarImpler implementor = new Implementor;
+        try {
+            if (args.length == 2) {
+                implementor.implement(Class.forName(args[0]), Paths.get(args[1]));
+            } else {
+                implementor.implementJar(Class.forName(args[1], Paths.get(args[2])));
+            }
+        } catch (InvalidPathException e) {
+            error("Invalid path in the second argument.", e);
+        } catch (ClassNotFoundException e) {
+            error("Invalid class in first argument.", e);
+        } catch (ImplerException e) {
+            error("An error occurred during implementation.", e);
+        }
+    }
+
+    private void error(String msg, Exception e) {
+        System.out.println(msg);
+        System.out.println("Exception's message: " + e.getMessage());
     }
 }
