@@ -33,8 +33,20 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 
+/**
+ * Implementation of {@link JarImpler}.
+ *
+ * This class produces code implementing class or interface and creates jar file containing it.
+ *
+ * @author  Golovin Pavel
+ */
 public class Implementor implements JarImpler {
 
+    /**
+     *
+     * @param aClass
+     * @return string representation name of implementing class.
+     */
     private String getClassName(Class<?> aClass) {
         return aClass.getSimpleName() + "Impl";
     }
@@ -61,6 +73,17 @@ public class Implementor implements JarImpler {
     private final static String CBRl = "{";
     private final static String CBRr = "}";
 
+    /**
+     * Generate first part of <code>aClass</code>'s implementation. It contains:
+     * <ul>
+     *     <li>package's declaration</li>
+     *     <li>class` declaration</li>
+     * </ul>
+     *
+     * @param aClass reflection of implementing class.
+     * @return string representation of first part of generating code.
+     */
+    //TODO implementing or implemented
     private String genHead(Class<?> aClass) {
         StringBuilder result = new StringBuilder();
         if (aClass.getPackage() != null) {
@@ -71,16 +94,34 @@ public class Implementor implements JarImpler {
         return result.toString();
     }
 
+    /**
+     * Generate last part of <code>aClass</code>'s implementation. Example, last back curly bracket.
+     *
+     * @param aClass reflection of implementing class.
+     * @return string representation of last part of generating code.
+     */
     private String genTail(Class<?> aClass) { // must be consistent with genHead()
         return CBRr;
     }
 
+    /**
+     * add reflection of abstract methods form array to set.
+     *
+     * @param methods array of reflection of method.
+     * @param storage set, witch collected abstract methods form <code>methods</code>
+     */
     private void addToMethodStorage(Method[] methods, Set<Method> storage) {
         Arrays.stream(methods)
                 .filter(method -> Modifier.isAbstract(method.getModifiers()))
                 .collect(Collectors.toCollection(() -> storage));
     }
 
+    /**
+     * Generate implementation of given class's method.
+     *
+     * @param aClass reflection of implementing class.
+     * @return string representation code of <code>aClass</code>'s abstract methods.
+     */
     private String genAbstractMethods(Class<?> aClass) {
         StringBuilder result = new StringBuilder();
 
@@ -102,10 +143,16 @@ public class Implementor implements JarImpler {
         return result.toString();
     }
 
+    /**
+     *  Generate implementation of given class' constructors.
+     *
+     * @param aClass reflection of implementing class.
+     * @return string representation code of <code>aClass</code>'s constructors.
+     */
     private String genConstructors(Class<?> aClass) {
         StringBuilder result = new StringBuilder();
         if (!aClass.isInterface()) {
-            for(Constructor constructor: aClass.getDeclaredConstructors()) {
+            for (Constructor constructor : aClass.getDeclaredConstructors()) {
                 if (!Modifier.isPrivate(constructor.getModifiers())) {
                     result.append(genExecutable(constructor, "", getClassName(aClass)));
                     result.append(TAP + TAP + "super");
@@ -120,6 +167,14 @@ public class Implementor implements JarImpler {
     }
 
 
+    /**
+     * Generate implementation of given class` constructor or method.
+     *
+     * @param func reflection of method or constructor.
+     * @param returnType string representation of <code>func</code>'s return type. Example, for constructor it's must be empty.
+     * @param funcName string representation of <code>func</code>`s name.
+     * @return string representation of this <code>func</code>.
+     */
     private String genExecutable(Executable func, String returnType, String funcName) {
         StringBuilder result = new StringBuilder();
 
@@ -131,12 +186,24 @@ public class Implementor implements JarImpler {
         return result.toString();
     }
 
+    /**
+     * Generate implementation of executable object's parameters.
+     *
+     * @param func executable object.
+     * @return string representation of <code>func</code>'s parameters.
+     */
     private String genParametersExecutable(Executable func) {
         return Arrays.stream(func.getParameters())
                 .map(parameter -> parameter.getType().getCanonicalName() + SPC + parameter.getName())
                 .collect(Collectors.joining(COMMA + SPC, BRl, BRr));
     }
 
+    /**
+     * Generate implement of specifying exceptions for executable object.
+     *
+     * @param func executable object.
+     * @return string representation of specifying exceptions thrown by <code>func</code>.
+     */
     private String genExceptionExecutable(Executable func) {
         if (func.getExceptionTypes().length == 0)
             return "";
@@ -146,19 +213,6 @@ public class Implementor implements JarImpler {
                     .collect(Collectors.joining(COMMA + SPC, "throws" + SPC, SPC));
     }
 
-    /**
-     * Produces code implementing class or interface specified by provided <tt>token</tt>.
-     * <p>
-     * Generated class full name should be same as full name of the type token with <tt>Impl</tt> suffix
-     * added. Generated source code should be placed in the correct subdirectory of the specified
-     * <tt>root</tt> directory and have correct file name. For example, the implementation of the
-     * interface {@link java.util.List} should go to <tt>$root/java/util/ListImpl.java</tt>
-     *
-     * @param token type token to create implementation for.
-     * @param root  root directory.
-     * @throws info.kgeorgiy.java.advanced.implementor.ImplerException when implementation cannot be
-     *                                                                 generated.
-     */
     @Override
     public void implement(Class<?> token, Path root) throws ImplerException {
         if (token == null || root == null) {
@@ -173,9 +227,10 @@ public class Implementor implements JarImpler {
             try {
                 code.write(genHead(token) + ESC);
                 if (!token.isInterface()) {
-                    if (genConstructors(token).isEmpty())
+                    String stringOfConstructor = genConstructors(token);
+                    if (stringOfConstructor.isEmpty())
                         throw new ImplerException("Couldn't access constructors of super class");
-                    code.write(genConstructors(token));
+                    code.write(stringOfConstructor);
                 }
                 code.write(genAbstractMethods(token));
                 code.write(genTail(token));
@@ -199,28 +254,16 @@ public class Implementor implements JarImpler {
         return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(pathFile.toString()), "UTF8"));
     }
 
-
-    /**
-     * Produces <tt>.jar</tt> file implementing class or interface specified by provided <tt>token</tt>.
-     * <p>
-     * Generated class full name should be same as full name of the type token with <tt>Impl</tt> suffix
-     * added.
-     *
-     * @param token type token to create implementation for.
-     * @param jarFile target <tt>.jar</tt> file.
-     * @throws ImplerException when implementation cannot be generated.@Override
-
-    */
     @Override
     public void implementJar(Class<?> token, Path jarFile) throws ImplerException {
         if (token == null || jarFile == null) {
             throw new ImplerException("Require not null argument.");
         }
 
-//        if (token.isPrimitive() || token.isArray() || Modifier.isFinal(token.getModifiers())
-//                || token == Enum.class) {
-//            throw new ImplerException("Incorrect type");
-//        }
+        if (token.isPrimitive() || token.isArray() || Modifier.isFinal(token.getModifiers())
+                || token == Enum.class) {
+            throw new ImplerException("Incorrect type");
+        }
 
         if (jarFile.getParent() != null) {
             try {
@@ -233,8 +276,7 @@ public class Implementor implements JarImpler {
         Path tempDir;
         try {
             tempDir = Files.createTempDirectory(jarFile.toAbsolutePath().getParent(), "temp");
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             throw new ImplerException("Problems with create temp directories.", e);
         }
 
@@ -259,14 +301,13 @@ public class Implementor implements JarImpler {
             } catch (IOException e) {
                 throw new ImplerException("Problem with write to jar-file");
             }
-        } catch(IOException e) {
-            throw new ImplerException("Problem with create jar-file" , e);
-        }
-        finally {
+        } catch (IOException e) {
+            throw new ImplerException("Problem with create jar-file", e);
+        } finally {
             try {
                 clean(tempDir);
             } catch (IOException e) {
-                error("Problem with detele temp files.", e);
+                error("Problem with delete temp files.", e);
             }
         }
     }
@@ -294,15 +335,18 @@ public class Implementor implements JarImpler {
             System.out.println("Two or three arguments expected.");
             return;
         }
-        for (String arg: args) {
+        for (String arg : args) {
             if (arg == null) {
                 System.out.println("expected non-null arguments.");
+                return;
             }
         }
         JarImpler implementor = new Implementor();
         try {
             if (args.length == 2) {
                 implementor.implement(Class.forName(args[0]), Paths.get(args[1]));
+            } else if (!args[0].equals("-jar")) {
+                System.out.println("\'" + args[0] + "\'" + " -- unknown argument, -jar expected.");
             } else {
                 implementor.implementJar(Class.forName(args[1]), Paths.get(args[2]));
             }
