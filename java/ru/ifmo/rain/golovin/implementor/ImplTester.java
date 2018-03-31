@@ -12,7 +12,7 @@ public class ImplTester {
 
     public static void main(String[] args) {
         try {
-            hero.implement(SDeprecated.class, Paths.get("/media/pavel/DATA/java-course/java/ru/ifmo/rain/golovin/implementor/temp/"));
+            hero.implement(BMPImageWriteParam.class, Paths.get("/media/pavel/DATA/java-course/java/ru/ifmo/rain/golovin/implementor/temp/"));
         }
         catch (Exception e) {
             System.out.println(e.getMessage());
