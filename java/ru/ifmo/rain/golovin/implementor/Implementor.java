@@ -16,6 +16,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -43,14 +44,21 @@ import java.util.zip.ZipEntry;
 public class Implementor implements JarImpler {
 
     /**
+     * Generate name of implementation of given class.
      *
-     * @param aClass
+     * @param aClass reflection of implementing class.
      * @return string representation name of implementing class.
      */
     private String getClassName(Class<?> aClass) {
         return aClass.getSimpleName() + "Impl";
     }
 
+    /**
+     * Generate code for return default value by given type.
+     *
+     * @param aClass reflection of type of default value.
+     * @return string representation of value.
+     */
     private String getDefaultValue(Class<?> aClass) {
         if (aClass.equals(boolean.class)) {
             return " false";
@@ -63,14 +71,49 @@ public class Implementor implements JarImpler {
         }
     }
 
+    /**
+     * Constant for generate code of implementation. It equals four space.
+     */
     private final static String TAP = "    ";
+
+    /**
+     * Constant for generate code of implementation. it equals one space.
+     */
     private final static String SPC = " ";
+
+    /**
+     * Constant for generate code of implementation. It equals <code>System.lineSeparator</code>.
+     */
     private final static String ESC = System.lineSeparator();
+
+    /**
+     * Constant for generate code of implementation. It equals one comma.
+     */
     private final static String COMMA = ",";
+
+    /**
+     * Constant for generate code of implementation. It equals one semicolon.
+     */
     private final static String SEMI = ";";
+
+    /**
+     * Constant for generate code of implementation. It equals one left round bracket.
+     */
     private final static String BRl = "(";
+
+    /**
+     * Constant for generate code of implementation. It equals one right round bracket.
+     */
     private final static String BRr = ")";
+
+    /**
+     * Constant for generate code of implementation. It equals one left curly bracket.
+     */
     private final static String CBRl = "{";
+
+    /**
+     * Constant for generate code of implementation. It equal one right curly bracket.
+     */
     private final static String CBRr = "}";
 
     /**
@@ -312,24 +355,42 @@ public class Implementor implements JarImpler {
         }
     }
 
+    /**
+     * Remove all file and directories from given file subtree.
+     *
+     * @param dir path root removed subtree.
+     * @throws IOException if an I/O error occurs.
+     */
     private void clean(Path dir) throws IOException {
-        Files.walkFileTree(dir, new Cleaner());
+        FileVisitor<Path> visitor = new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        };
+        Files.walkFileTree(dir, visitor);
     }
 
-    private static class Cleaner extends SimpleFileVisitor<Path> {
-        @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            Files.delete(file);
-            return FileVisitResult.CONTINUE;
-        }
-
-        @Override
-        public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            Files.delete(dir);
-            return FileVisitResult.CONTINUE;
-        }
-    }
-
+    /**
+     * Get console argument and execute implementation.
+     * Two mode is possible:
+     *  <ul>
+     *  <li> 2 arguments: <tt>className rootPath</tt> - call {@link #implement(Class, Path)} with given arguments.
+     *      It's generate implementation of class or interface</li>
+     *  <li> 3 arguments: <tt>-jar className jarPath</tt> - call {@link #implementJar(Class, Path)} with two second arguments.
+     *      It's generate jar file with implementation of class or interface. </li>
+     *  </ul>
+     *  If arguments are incorrect or an error occurs during implementation returns message with information about error.
+     *
+     * @param args arguments for running an application.
+     */
     public static void main(String[] args) {
         if (args == null || (args.length != 2 && args.length != 3)) {
             System.out.println("Two or three arguments expected.");
@@ -359,6 +420,12 @@ public class Implementor implements JarImpler {
         }
     }
 
+    /**
+     * Print in stdout custom message and exception's message.
+     *
+     * @param msg custom message
+     * @param e exception
+     */
     private static void error(String msg, Exception e) {
         System.out.println(msg);
         System.out.println("Exception's message: " + e.getMessage());
