@@ -281,7 +281,7 @@ public class Implementor implements JarImpler {
                 throw new ImplerException("Problems with writing file.", e);
             }
         } catch (IOException e) {
-            throw new ImplerException("Problems with create or close.", e);
+            throw new ImplerException("Problems with creating or closing generated file.", e);
         }
     }
 
@@ -292,7 +292,7 @@ public class Implementor implements JarImpler {
     private BufferedWriter createFile(Class<?> token, Path path) throws IOException {
         Path pathFile = resolveFilePath(path, token, ".java"); //  path.resolve(token.getCanonicalName().replace('.', File.separatorChar) + "Impl.java");
         Files.createDirectories(Objects.requireNonNull(pathFile.getParent()));
-        Files.deleteIfExists(pathFile); //TODO
+        Files.deleteIfExists(pathFile);
         Files.createFile(pathFile);
         return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(pathFile.toString()), "UTF8"));
     }
@@ -312,7 +312,7 @@ public class Implementor implements JarImpler {
             try {
                 Files.createDirectories(jarFile.getParent());
             } catch (IOException e) {
-                throw new ImplerException("Problems with create directories for temp files.", e);
+                throw new ImplerException("Problems with creating directories for temp files.", e);
             }
         }
 
@@ -320,7 +320,7 @@ public class Implementor implements JarImpler {
         try {
             tempDir = Files.createTempDirectory(jarFile.toAbsolutePath().getParent(), "temp");
         } catch (IOException e) {
-            throw new ImplerException("Problems with create temp directories.", e);
+            throw new ImplerException("Problems with creating temp directories.", e);
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -336,16 +336,16 @@ public class Implementor implements JarImpler {
         try (JarOutputStream jarStream = new JarOutputStream(Files.newOutputStream(jarFile), manifest)) {
             implement(token, tempDir);
             if (compiler.run(null, null, null, args) != 0) {
-                throw new ImplerException("Problem with compile generative file.");
+                throw new ImplerException("Problem with compiling generative file.");
             }
             try {
                 jarStream.putNextEntry(new ZipEntry(token.getName().replace('.', '/') + "Impl.class"));
                 Files.copy(resolveFilePath(tempDir, token, ".class"), jarStream);
             } catch (IOException e) {
-                throw new ImplerException("Problem with write to jar-file");
+                throw new ImplerException("Problem with writing to jar-file");
             }
         } catch (IOException e) {
-            throw new ImplerException("Problem with create jar-file", e);
+            throw new ImplerException("Problem with creating or closing jar-file", e);
         } finally {
             try {
                 clean(tempDir);
