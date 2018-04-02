@@ -6,3 +6,5 @@ java/ru/ifmo/rain/golovin/walk/Sss.java
 java/ru/ifmo/rain/golovin/student/test.java
 **/testing.java
 *.class
+javaDocJarImplementor/*
+jar-files/*
