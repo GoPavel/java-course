@@ -72,61 +72,60 @@ public class Implementor implements JarImpler {
     }
 
     /**
-     * Constant for generate code of implementation. It equals four space.
+     * Constants for generating code of implementation. It equals to four space.
      */
     private final static String TAP = "    ";
 
     /**
-     * Constant for generate code of implementation. it equals one space.
+     * Constant for generating code of implementation. it equals to one space.
      */
     private final static String SPC = " ";
 
     /**
-     * Constant for generate code of implementation. It equals <code>System.lineSeparator</code>.
+     * Constant for generating code of implementation. It equals to <code>System.lineSeparator</code>.
      */
     private final static String ESC = System.lineSeparator();
 
     /**
-     * Constant for generate code of implementation. It equals one comma.
+     * Constant for generating code of implementation. It equals to one comma.
      */
     private final static String COMMA = ",";
 
     /**
-     * Constant for generate code of implementation. It equals one semicolon.
+     * Constant for generating code of implementation. It equals to one semicolon.
      */
     private final static String SEMI = ";";
 
     /**
-     * Constant for generate code of implementation. It equals one left round bracket.
+     * Constant for generating code of implementation. It equals to one left round bracket.
      */
     private final static String BRl = "(";
 
     /**
-     * Constant for generate code of implementation. It equals one right round bracket.
+     * Constant for generating code of implementation. It equals to one right round bracket.
      */
     private final static String BRr = ")";
 
     /**
-     * Constant for generate code of implementation. It equals one left curly bracket.
+     * Constant for generating code of implementation. It equals to one left curly bracket.
      */
     private final static String CBRl = "{";
 
     /**
-     * Constant for generate code of implementation. It equal one right curly bracket.
+     * Constant for generating code of implementation. It equal one right curly bracket.
      */
     private final static String CBRr = "}";
 
     /**
-     * Generate first part of <code>aClass</code>'s implementation. It contains:
+     * Generate the first part of <code>aClass</code>'s implementation. It contains:
      * <ul>
      *     <li>package's declaration</li>
      *     <li>class` declaration</li>
      * </ul>
      *
      * @param aClass reflection of implementing class.
-     * @return string representation of first part of generating code.
+     * @return string representation of the the first part of generating code.
      */
-    //TODO implementing or implemented
     private String genHead(Class<?> aClass) {
         StringBuilder result = new StringBuilder();
         if (aClass.getPackage() != null) {
@@ -172,8 +171,11 @@ public class Implementor implements JarImpler {
                 method -> (method.getName() + Arrays.toString(method.getParameterTypes())).hashCode()));
 
         addToMethodStorage(aClass.getMethods(), methods);
-        for (Class<?> token = aClass; token != null; token = token.getSuperclass()) {
-            addToMethodStorage(token.getDeclaredMethods(), methods);
+
+        if (!aClass.isInterface()) {
+            for (Class<?> token = aClass; token != null; token = token.getSuperclass()) {
+                addToMethodStorage(token.getDeclaredMethods(), methods);
+            }
         }
 
         for (Method method : methods) {
@@ -290,7 +292,7 @@ public class Implementor implements JarImpler {
     }
 
     private BufferedWriter createFile(Class<?> token, Path path) throws IOException {
-        Path pathFile = resolveFilePath(path, token, ".java"); //  path.resolve(token.getCanonicalName().replace('.', File.separatorChar) + "Impl.java");
+        Path pathFile = resolveFilePath(path, token, ".java");
         Files.createDirectories(Objects.requireNonNull(pathFile.getParent()));
         Files.deleteIfExists(pathFile);
         Files.createFile(pathFile);
@@ -324,6 +326,10 @@ public class Implementor implements JarImpler {
         }
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            throw new ImplerException("Problem with the compiler.");
+        }
+
         String[] args = new String[3];
         args[0] = "-cp";
         args[1] = tempDir.toString() + File.pathSeparator + System.getProperty("java.class.path");
@@ -379,12 +385,12 @@ public class Implementor implements JarImpler {
     }
 
     /**
-     * Get console argument and execute implementation.
+     * Gets console argument and executes implementation.
      * Two mode is possible:
      *  <ul>
      *  <li> 2 arguments: <tt>className rootPath</tt> - call {@link #implement(Class, Path)} with given arguments.
      *      It's generate implementation of class or interface</li>
-     *  <li> 3 arguments: <tt>-jar className jarPath</tt> - call {@link #implementJar(Class, Path)} with two second arguments.
+     *  <li> 3 arguments: <tt>-jar className jarPath</tt> - call {@link #implementJar(Class, Path)} with two last arguments.
      *      It's generate jar file with implementation of class or interface. </li>
      *  </ul>
      *  If arguments are incorrect or an error occurs during implementation returns message with information about error.
@@ -414,7 +420,7 @@ public class Implementor implements JarImpler {
         } catch (InvalidPathException e) {
             error("Invalid path in the second argument.", e);
         } catch (ClassNotFoundException e) {
-            error("Invalid class in first argument.", e);
+            error("Invalid class in the first argument.", e);
         } catch (ImplerException e) {
             error("An error occurred during implementation.", e);
         }
