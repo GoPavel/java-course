@@ -293,7 +293,9 @@ public class Implementor implements JarImpler {
 
     private BufferedWriter createFile(Class<?> token, Path path) throws IOException {
         Path pathFile = resolveFilePath(path, token, ".java");
-        Files.createDirectories(Objects.requireNonNull(pathFile.getParent()));
+        if (pathFile.getParent() != null) {    
+            Files.createDirectories(pathFile.getParent());
+        }
         Files.deleteIfExists(pathFile);
         Files.createFile(pathFile);
         return new BufferedWriter(new OutputStreamWriter(new FileOutputStream(pathFile.toString()), "UTF8"));

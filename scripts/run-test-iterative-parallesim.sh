@@ -8,18 +8,18 @@ mkdir ../out 2> /dev/null
 javac \
     -d ../out \
     -cp \
-        ../artifacts/JarImplementorTest.jar:`
+        ../artifacts/IterativeParallelismTest.jar:`
         `../lib/hamcrest-core-1.3.jar:`
         `../lib/junit-4.11.jar:`
         `../lib/jsoup-1.8.1.jar:`
         `../lib/quickcheck-0.6.jar: \
-    -Xlint ../java/ru/ifmo/rain/golovin/implementor/Implementor.java
+    -Xlint ../java/ru/ifmo/rain/golovin/concurrent/ListIPImpl.java
 
 java -cp \
-        ../artifacts/JarImplementorTest.jar:`
+        ../artifacts/IterativeParallelismTest.jar:`
         `../lib/hamcrest-core-1.3.jar:`
         `../lib/junit-4.11.jar:`
         `../lib/jsoup-1.8.1.jar:`
         `../lib/quickcheck-0.6.jar:`
         `../out \
-    info.kgeorgiy.java.advanced.implementor.Tester jar-class ru.ifmo.rain.golovin.implementor.Implementor $1
+    info.kgeorgiy.java.advanced.concurrent.Tester list ru.ifmo.rain.golovin.concurrent.ListIPImpl $1
