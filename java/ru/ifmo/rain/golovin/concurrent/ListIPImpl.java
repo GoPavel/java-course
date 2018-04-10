@@ -1,6 +1,8 @@
 package ru.ifmo.rain.golovin.concurrent;
 
 import info.kgeorgiy.java.advanced.concurrent.ListIP;
+import info.kgeorgiy.java.advanced.mapper.ParallelMapper;
+import ru.ifmo.rain.golovin.mapper.ParallelMapperImpl;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,6 +18,12 @@ import java.util.stream.Stream;
 import static java.lang.Integer.min;
 
 public class ListIPImpl implements ListIP {
+
+    private ParallelMapper parallelMapper;
+
+    public ListIPImpl(ParallelMapper mapper) {
+        parallelMapper = mapper;
+    }
 
     private String emptyString = "";
 
@@ -41,12 +49,77 @@ public class ListIPImpl implements ListIP {
         }
     }
 
+    private <T, MapT> MapT runThread1(int _cntThreads, List<? extends T> values, Function<? super T, MapT> map, BinaryOperator<MapT> op)
+            throws InterruptedException {
+        int cntThreads = min(parallelMapper.getCountThread(), values.size());
+        int lenPart = values.size() / cntThreads;
+
+        int cntRun = 0;
+
+        List<List<? extends T>> parts = new LinkedList<>();
+
+        int rem = values.size() % cntThreads;
+        if (rem > 0) {
+            lenPart++;
+        }
+
+        for (int l = 0, r = lenPart; l < values.size(); l = r, r += lenPart, cntRun++) {
+            parts.add(values.subList(l, r > values.size() ? values.size() : r));
+        }
+            Thread thread = new Thread(new Folding<T, MapT>(values.subList(l, r > values.size() ? values.size() : r), map, op, results, cntRun));
+            thread.start();
+            threads.add(thread);
+            if (rem != 0 && rem == cntRun + 1) {
+                lenPart--;
+            }
+        }
+
+        InterruptedException anyInterruptedException = null;
+        for (int i = 0; i < cntRun; ++i) {
+            try {
+                threads.get(i).join();
+            } catch (InterruptedException e) {
+                if (anyInterruptedException == null) {
+                    anyInterruptedException = e;
+                } else {
+                    anyInterruptedException.addSuppressed(e);
+                }
+            }
+        }
+
+        if (anyInterruptedException != null) {
+            throw anyInterruptedException;
+        }
+
+        return results.stream().filter(Predicate.isEqual(null).negate()).reduce(op).orElse(null);
+    }
+
+
+    private <T> List<List<? extends T>> splitListOnThreads(int _cntThreads, List<? extends T> values) {
+        int cntThread = min(_cntThreads, values.size());
+        int lenPart = values.size() / cntThread;
+
+        LinkedList<List<? extends T>> groups = new LinkedList<>();
+
+        int rem = values.size() % cntThread;
+        if (rem > 0)
+            lenPart++;
+        for (int l = 0, r = lenPart, cntRun = 0; l < values.size(); l = r, r += lenPart, cntRun++) {
+            groups.add(values.subList(l, r > values.size() ? values.size() : r));
+            if (rem != 0 && rem == cntRun + 1) {
+                lenPart--;
+            }
+        }
+
+        return groups;
+    }
+
     private <T, MapT> MapT runThread(int _cntThreads, List<? extends T> values, Function<? super T, MapT> map, BinaryOperator<MapT> op)
             throws InterruptedException {
         int cntThreads = min(_cntThreads, values.size());
         int lenPart = values.size() / cntThreads;
 
-        Thread[] threads = new Thread[cntThreads];
+        ArrayList<Thread> threads = new ArrayList<Thread>();
         int cntRun = 0;
 
         ArrayList<MapT> results = new ArrayList<>(Collections.nCopies(cntThreads, null));
@@ -56,8 +129,9 @@ public class ListIPImpl implements ListIP {
             lenPart++;
         }
         for (int l = 0, r = lenPart; l < values.size(); l = r, r += lenPart, cntRun++) {
-            threads[cntRun] = new Thread(new Folding<T, MapT>(values.subList(l, r > values.size() ? values.size() : r), map, op, results, cntRun));
-            threads[cntRun].start();
+            Thread thread = new Thread(new Folding<T, MapT>(values.subList(l, r > values.size() ? values.size() : r), map, op, results, cntRun));
+            thread.start();
+            threads.add(thread);
             if (rem != 0 && rem == cntRun + 1) {
                 lenPart--;
             }
@@ -66,7 +140,7 @@ public class ListIPImpl implements ListIP {
         InterruptedException anyInterruptedException = null;
         for (int i = 0; i < cntRun; ++i) {
             try {
-                threads[i].join();
+                threads.get(i).join();
             } catch (InterruptedException e) {
                 if (anyInterruptedException == null) {
                     anyInterruptedException = e;
