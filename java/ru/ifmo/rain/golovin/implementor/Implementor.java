@@ -44,6 +44,11 @@ import java.util.zip.ZipEntry;
 public class Implementor implements JarImpler {
 
     /**
+     * Create new instance.
+     */
+    public Implementor() { }
+
+    /**
      * Generate name of implementation of given class.
      *
      * @param aClass reflection of implementing class.
@@ -74,7 +79,7 @@ public class Implementor implements JarImpler {
     /**
      * Constants for generating code of implementation. It equals to four space.
      */
-    private final static String TAP = "    ";
+    private final static String TAB = "    ";
 
     /**
      * Constant for generating code of implementation. it equals to one space.
@@ -84,7 +89,7 @@ public class Implementor implements JarImpler {
     /**
      * Constant for generating code of implementation. It equals to <code>System.lineSeparator</code>.
      */
-    private final static String ESC = System.lineSeparator();
+    private final static String NEWLINE = System.lineSeparator();
 
     /**
      * Constant for generating code of implementation. It equals to one comma.
@@ -129,10 +134,10 @@ public class Implementor implements JarImpler {
     private String genHead(Class<?> aClass) {
         StringBuilder result = new StringBuilder();
         if (aClass.getPackage() != null) {
-            result.append("package" + SPC + aClass.getPackage().getName() + SEMI + ESC + ESC);
+            result.append("package" + SPC + aClass.getPackage().getName() + SEMI + NEWLINE + NEWLINE);
         }
         result.append("public" + SPC + "class" + SPC + getClassName(aClass) + SPC +
-                (aClass.isInterface() ? "implements" : "extends") + SPC + aClass.getSimpleName() + SPC + CBRl + ESC);
+                (aClass.isInterface() ? "implements" : "extends") + SPC + aClass.getSimpleName() + SPC + CBRl + NEWLINE);
         return result.toString();
     }
 
@@ -180,9 +185,9 @@ public class Implementor implements JarImpler {
 
         for (Method method : methods) {
             result.append(genExecutable(method, method.getReturnType().getCanonicalName(), method.getName()));
-            result.append(TAP + TAP + "return" + getDefaultValue(method.getReturnType()) + SEMI + ESC);
-            result.append(TAP + CBRr + ESC);
-            result.append(ESC);
+            result.append(TAB + TAB + "return" + getDefaultValue(method.getReturnType()) + SEMI + NEWLINE);
+            result.append(TAB + CBRr + NEWLINE);
+            result.append(NEWLINE);
         }
 
         return result.toString();
@@ -200,11 +205,11 @@ public class Implementor implements JarImpler {
             for (Constructor constructor : aClass.getDeclaredConstructors()) {
                 if (!Modifier.isPrivate(constructor.getModifiers())) {
                     result.append(genExecutable(constructor, "", getClassName(aClass)));
-                    result.append(TAP + TAP + "super");
+                    result.append(TAB + TAB + "super");
                     result.append(Arrays.stream(constructor.getParameters()).map(Parameter::getName)
-                            .collect(Collectors.joining(COMMA + SPC, BRl, BRr)) + SEMI + ESC);
-                    result.append(TAP + CBRr + ESC);
-                    result.append(ESC);
+                            .collect(Collectors.joining(COMMA + SPC, BRl, BRr)) + SEMI + NEWLINE);
+                    result.append(TAB + CBRr + NEWLINE);
+                    result.append(NEWLINE);
                 }
             }
         }
@@ -223,11 +228,11 @@ public class Implementor implements JarImpler {
     private String genExecutable(Executable func, String returnType, String funcName) {
         StringBuilder result = new StringBuilder();
 
-        result.append(TAP + Modifier.toString(func.getModifiers()).replaceAll("abstract|transient|volatile|native", ""));
+        result.append(TAB + Modifier.toString(func.getModifiers() & ~(Modifier.ABSTRACT|Modifier.TRANSIENT|Modifier.VOLATILE)) + SPC);
         result.append(returnType + SPC);
         result.append(funcName);
         result.append(genParametersExecutable(func) + SPC);
-        result.append(genExceptionExecutable(func) + CBRl + ESC);
+        result.append(genExceptionExecutable(func) + CBRl + NEWLINE);
         return result.toString();
     }
 
@@ -270,7 +275,7 @@ public class Implementor implements JarImpler {
 
         try (BufferedWriter code = createFile(token, root)) {
             try {
-                code.write(genHead(token) + ESC);
+                code.write(genHead(token) + NEWLINE);
                 if (!token.isInterface()) {
                     String stringOfConstructor = genConstructors(token);
                     if (stringOfConstructor.isEmpty())
@@ -287,13 +292,29 @@ public class Implementor implements JarImpler {
         }
     }
 
+    /**
+     * Resolve path file: convernt package to path and append extension;
+     *
+     * @param path path file with code
+     * @param aClass reflection of implementing class.
+     * @param end string representation of extension.
+     * @return path to file
+     */
     private Path resolveFilePath(Path path, Class<?> aClass, String end) {
         return path.resolve(aClass.getPackage().getName().replace('.', File.separatorChar)).resolve(getClassName(aClass) + end);
     }
 
+    /**
+     * Crete file for code implementation and directories on path to file.
+     *
+     * @param token reflection of implementing class.
+     * @param path path to implementing class.
+     * @return writer on new file.
+     * @throws IOException if occurred problem with create file or directories.
+     */
     private BufferedWriter createFile(Class<?> token, Path path) throws IOException {
         Path pathFile = resolveFilePath(path, token, ".java");
-        if (pathFile.getParent() != null) {    
+        if (pathFile.getParent() != null) {
             Files.createDirectories(pathFile.getParent());
         }
         Files.deleteIfExists(pathFile);
@@ -327,29 +348,30 @@ public class Implementor implements JarImpler {
             throw new ImplerException("Problems with creating temp directories.", e);
         }
 
+        implement(token, tempDir);
+
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             throw new ImplerException("Problem with the compiler.");
         }
 
-        String[] args = new String[3];
-        args[0] = "-cp";
-        args[1] = tempDir.toString() + File.pathSeparator + System.getProperty("java.class.path");
-        args[2] = resolveFilePath(tempDir, token, ".java").toString();
+        String[] args = new String[] { "-cp",
+            tempDir.toString() + File.pathSeparator + System.getProperty("java.class.path"),
+            resolveFilePath(tempDir, token, ".java").toString() };
+
+        if (compiler.run(null, null, null, args) != 0) {
+            throw new ImplerException("Problem with compiling generative file.");
+        }
 
         Manifest manifest = new Manifest();
         Attributes attributes = manifest.getMainAttributes();
         attributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
         attributes.put(Attributes.Name.IMPLEMENTATION_VENDOR, "Golovin Pavel");
         try (JarOutputStream jarStream = new JarOutputStream(Files.newOutputStream(jarFile), manifest)) {
-            implement(token, tempDir);
-            if (compiler.run(null, null, null, args) != 0) {
-                throw new ImplerException("Problem with compiling generative file.");
-            }
             try {
                 jarStream.putNextEntry(new ZipEntry(token.getName().replace('.', '/') + "Impl.class"));
                 Files.copy(resolveFilePath(tempDir, token, ".class"), jarStream);
-            } catch (IOException e) {
+            }   catch (IOException e) {
                 throw new ImplerException("Problem with writing to jar-file");
             }
         } catch (IOException e) {
