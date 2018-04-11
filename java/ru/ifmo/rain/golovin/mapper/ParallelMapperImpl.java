@@ -3,6 +3,7 @@ package ru.ifmo.rain.golovin.mapper;
 import info.kgeorgiy.java.advanced.mapper.ParallelMapper;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -73,13 +74,15 @@ public class ParallelMapperImpl implements ParallelMapper {
 
         public void run() {
             while (true) {
-                while (!queue.isEmpty()) {
-                    try {
-                        wait();
-                    } catch (InterruptedException e) { }
+                Task myTask;
+                synchronized (queue) {
+                    while (queue.isEmpty()) {
+                        try {
+                            queue.wait();
+                        } catch (InterruptedException e) { }
+                    }
+                    myTask = queue.pop();
                 }
-
-                Task myTask = queue.pop();
 
                 myTask.doIt();
 
@@ -105,7 +108,7 @@ public class ParallelMapperImpl implements ParallelMapper {
         arrayOfThread = new ArrayList<>(threads);
         for (int i = 0; i < cntThreads; ++i) {
             Thread thread = new Thread(new Worker());
-            thread.run();
+            thread.start();
             arrayOfThread.add(thread);
         }
     }
@@ -122,17 +125,19 @@ public class ParallelMapperImpl implements ParallelMapper {
             throws InterruptedException {
         Counter counter = new Counter(args.size());
 
-        List<R> resaults = new ArrayList<>(args.size());
+        List<R> results = new ArrayList<>(Collections.nCopies(args.size(), null));
 
         for (int indexTask = 0; indexTask < args.size(); ++indexTask) {
-            queue.push(new Task<T, R>(map, counter, resaults, indexTask, args.get(indexTask)));
+            queue.push(new Task<T, R>(map, counter, results, indexTask, args.get(indexTask)));
         }
 
-        while (counter.get() > 0) {
-            wait();
+        synchronized (counter) {
+            while (counter.get() > 0) {
+                counter.wait();
+            }
         }
 
-        return resaults;
+        return results;
     }
 
     /** Stops all threads. All unfinished mappings leave in undefined state. */

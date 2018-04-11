@@ -13,7 +13,7 @@ javac \
         `../lib/junit-4.11.jar:`
         `../lib/jsoup-1.8.1.jar:`
         `../lib/quickcheck-0.6.jar: \
-    -Xlint ../java/ru/ifmo/rain/golovin/concurrent/ListIPImpl.java
+     ../java/ru/ifmo/rain/golovin/concurrent/ListIPImpl.java
 
 java -cp \
         ../artifacts/IterativeParallelismTest.jar:`
