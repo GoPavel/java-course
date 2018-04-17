@@ -111,7 +111,8 @@ public class ListIPImpl implements ListIP {
         } else {
             results = parallelMapper.map(group -> {
                 ArrayList<MapT> res = new ArrayList<>(Collections.nCopies(1, null));
-                Folding<T, MapT> f = new Folding<>(group, map, op, res, 1);
+                Folding<T, MapT> f = new Folding<>(group, map, op, res, 0);
+                f.run();
                 return res.get(0);
             }, groups);
         }
