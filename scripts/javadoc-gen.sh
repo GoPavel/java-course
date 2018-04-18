@@ -14,3 +14,5 @@ javadoc \
      ../java/info/kgeorgiy/java/advanced/implementor/Impler.java \
      ../java/info/kgeorgiy/java/advanced/implementor/JarImpler.java \
      ../java/info/kgeorgiy/java/advanced/implementor/ImplerException.java
+
+firefox ../javaDocJarImplementor/index.html

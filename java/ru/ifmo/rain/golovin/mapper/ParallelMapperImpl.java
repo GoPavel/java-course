@@ -6,14 +6,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 public class ParallelMapperImpl implements ParallelMapper {
 
     private static class ThreadSafetyQueue {
-        private LinkedList<Task> taskList = new LinkedList<Task>();
+        private LinkedList<Task> taskList = new LinkedList<>();
 
         public synchronized void push(Task task) {
             taskList.push(task);
@@ -32,7 +30,7 @@ public class ParallelMapperImpl implements ParallelMapper {
     private static class Counter {
         private int val;
 
-        public Counter (int valP) {
+        public Counter(int valP) {
             val = valP;
         }
 
@@ -50,13 +48,13 @@ public class ParallelMapperImpl implements ParallelMapper {
     }
 
     private static class Task<T, R> {
-        private final Function <? super T, ? extends R> f;
+        private final Function<? super T, ? extends R> f;
         private final Counter counter;
         private final List<R> pullResult;
         private final int indexInPull;
         private final T arg;
 
-        public Task(Function <? super T, ? extends R> fP, Counter counterP, List<R> pullResultP, int indexInPullP, T argP) {
+        public Task(Function<? super T, ? extends R> fP, Counter counterP, List<R> pullResultP, int indexInPullP, T argP) {
             f = fP;
             counter = counterP;
             pullResult = pullResultP;
@@ -70,33 +68,33 @@ public class ParallelMapperImpl implements ParallelMapper {
     }
 
     private class Worker implements Runnable {
-//        public Worker()
 
         public void run() {
-            while (true) {
-                Task myTask;
-                synchronized (queue) {
-                    while (queue.isEmpty()) {
-                        try {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Task myTask;
+                    synchronized (queue) {
+                        while (queue.isEmpty()) {
                             queue.wait();
-                        } catch (InterruptedException e) { }
+                        }
+                        myTask = queue.pop();
                     }
-                    myTask = queue.pop();
+
+                    myTask.doIt();
+
+                    myTask.counter.dec();
+
                 }
-
-                myTask.doIt();
-
-                myTask.counter.dec();
-
+            } catch (InterruptedException e) {
             }
         }
     }
 
-    private ArrayList<Thread> arrayOfThread;
+    final private ArrayList<Thread> arrayOfThread;
 
-    private ThreadSafetyQueue queue;
+    final private ThreadSafetyQueue queue;
 
-    private int cntThreads;
+    final private int cntThreads;
 
     public int getCountThread() {
         return cntThreads;
@@ -105,7 +103,7 @@ public class ParallelMapperImpl implements ParallelMapper {
     public ParallelMapperImpl(int threads) {
         cntThreads = threads;
         queue = new ThreadSafetyQueue();
-        arrayOfThread = new ArrayList<>(threads);
+        arrayOfThread = new ArrayList<>();
         for (int i = 0; i < cntThreads; ++i) {
             Thread thread = new Thread(new Worker());
             thread.start();
@@ -140,12 +138,12 @@ public class ParallelMapperImpl implements ParallelMapper {
         return results;
     }
 
-    /** Stops all threads. All unfinished mappings leave in undefined state. */
+    /**
+     * Stops all threads. All unfinished mappings leave in undefined state.
+     */
     @Override
     public void close() {
-        for (int i = 0; i < cntThreads; ++i) {
-            arrayOfThread.get(i).interrupt();
-        }
+        arrayOfThread.forEach(Thread::interrupt);
     }
 
 }

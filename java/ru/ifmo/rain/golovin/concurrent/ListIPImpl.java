@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -60,8 +59,9 @@ public class ListIPImpl implements ListIP {
         LinkedList<List<? extends T>> groups = new LinkedList<>();
 
         int rem = values.size() % cntThread;
-        if (rem > 0)
+        if (rem > 0) {
             lenPart++;
+        }
         for (int l = 0, r = lenPart, cntRun = 0; l < values.size(); l = r, r += lenPart, cntRun++) {
             groups.add(values.subList(l, r > values.size() ? values.size() : r));
             if (rem != 0 && rem == cntRun + 1) {
@@ -146,7 +146,7 @@ public class ListIPImpl implements ListIP {
         if (!checkNonNullArgument(values, predicate)) {
             throw new IllegalArgumentException();
         }
-        return this.<T, Boolean>runThread(threads, values, predicate::test, (b1, b2) -> (b1 == null) ? false : b1 && (b2 == null ? false : b2));
+        return this.<T, Boolean>runThread(threads, values, predicate::test, (b1, b2) -> (b1 != null) && (b1 && (b2 == null ? false : b2)));
     }
 
     @Override
@@ -197,10 +197,11 @@ public class ListIPImpl implements ListIP {
                 });
     }
 
-    private <T1, T2>boolean checkNonNullArgument(T1 t1, T2 t2) {
-        return  t1 != null && t2 != null;
+    private <T1, T2> boolean checkNonNullArgument(T1 t1, T2 t2) {
+        return t1 != null && t2 != null;
     }
-    private <T1>boolean checkNonNullArgument(T1 t1) {
-        return  t1 != null;
+
+    private <T1> boolean checkNonNullArgument(T1 t1) {
+        return t1 != null;
     }
 }
