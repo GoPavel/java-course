@@ -5,10 +5,10 @@ import info.kgeorgiy.java.advanced.crawler.Crawler;
 import info.kgeorgiy.java.advanced.crawler.Document;
 import info.kgeorgiy.java.advanced.crawler.Downloader;
 import info.kgeorgiy.java.advanced.crawler.Result;
+import info.kgeorgiy.java.advanced.crawler.URLUtils;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -32,14 +32,6 @@ public class WebCrawler implements Crawler {
 
     private int perHost;
 
-    private String getHost(String url) {
-        try {
-            return new URL(url).getHost();
-        } catch (MalformedURLException e) {
-            return null;
-        }
-    }
-
     private static class DataWrapper {
         private String url;
         private Document document;
@@ -60,12 +52,11 @@ public class WebCrawler implements Crawler {
 
     private class TaskLoading implements Runnable {
         private final String url;
-        private final String host;
         private final Phaser phaser;
         private final BlockingQueue<DataWrapper> dataQueue;
         private final ConcurrentMap<String, IOException> errors;
         private final ConcurrentMap<String, Semaphore> hostSemaphore;
-        private final ConcurrentSkipListSet<String> notesOfUrl;
+        private final ConcurrentSkipListSet<String> notesOfUrl; // TODO replace class to interface
         private int depth;
 
         private TaskLoading(String url,
@@ -76,8 +67,8 @@ public class WebCrawler implements Crawler {
                             ConcurrentSkipListSet<String> notesOfUrl,
                             int depth) {
             this.url = url;
-            this.host = getHost(url);
             this.phaser = phaser;
+            phaser.register();
             this.dataQueue = dataQueue;
             this.errors = errors;
             this.hostSemaphore = hostSemaphore;
@@ -89,30 +80,38 @@ public class WebCrawler implements Crawler {
         @Override
         public void run() {
             try {
-                Semaphore semaphore = hostSemaphore.get(host);
-                if (semaphore == null) {
-                    semaphore = new Semaphore(perHost);
-                    hostSemaphore.put(host, semaphore);
-                }
+                String host = URLUtils.getHost(url);
 
-                semaphore.acquire();
+                if (hostSemaphore.get(host) == null) {
+                    hostSemaphore.putIfAbsent(host, new Semaphore(perHost));
+                }
+                Semaphore semaphore = hostSemaphore.get(host);
+
                 Document document = null;
                 try {
-                    document = downloader.download(url);
-                } catch (IOException e) {
-                    errors.put(url, e);
+                    semaphore.acquire();
+                    try {
+                        document = downloader.download(url);
+                    } catch (IOException e) {
+                        errors.put(url, e);
+                    }
+                } finally {
+                    semaphore.release();
                 }
-                semaphore.release();
 
-                if (depth != 0 && document != null) {
+                if (depth > 1 && document != null) {
                     extractPool.submit(new TaskExtractLink(url, phaser, dataQueue,
                             hostSemaphore, errors, notesOfUrl, depth, document));
                 }
+                if (document != null)
+                        dataQueue.add(new DataWrapper(url));
 
-                dataQueue.add(new DataWrapper(url));
-
-                phaser.arrive();
             } catch (InterruptedException e) {
+
+            } catch (MalformedURLException e) {
+                errors.put(url, e);
+            } finally {
+                phaser.arrive();
             }
         }
     }
@@ -148,23 +147,22 @@ public class WebCrawler implements Crawler {
 
         @Override
         public void run() {
-            List<String> urls = null;
             try {
-                urls = document.extractLinks();
-            } catch (IOException e) {
-                errors.put(url, e);
-            }
+                List<String> urls = document.extractLinks();
 
-            if (urls != null) {
-                for (String url : urls) {
-                    if (notesOfUrl.add(url)) {
-                        downloadPool.submit(new TaskLoading(url, phaser, dataQueue,
-                                errors, hostSemaphore, notesOfUrl, depth - 1));
+                if (urls != null) {
+                    for (String url : urls) {
+                        if (notesOfUrl.add(url)) {
+                            downloadPool.submit(new TaskLoading(url, phaser, dataQueue,
+                                    errors, hostSemaphore, notesOfUrl, depth - 1));
+                        }
                     }
                 }
+            }catch (IOException e) {
+                errors.put(url, e);
+            } finally   {
+                phaser.arrive();
             }
-
-            phaser.arrive();
         }
     }
 
@@ -187,12 +185,13 @@ public class WebCrawler implements Crawler {
         BlockingQueue<DataWrapper> result = new LinkedBlockingDeque<>(); // for result
         ConcurrentMap<String, IOException> errors = new ConcurrentHashMap<>();
         ConcurrentMap<String, Semaphore> hostSemaphore = new ConcurrentHashMap<>(); // check per host limit
-        ConcurrentSkipListSet<String> notes = new ConcurrentSkipListSet<>(); // for unique check
+        ConcurrentSkipListSet<String> notesOfUrl = new ConcurrentSkipListSet<>(); // for unique check
 
-        Phaser phaser = new Phaser();
+        Phaser phaser = new Phaser(1);
 
+        notesOfUrl.add(url);
         downloadPool.submit(new TaskLoading(url, phaser, result,
-                errors, hostSemaphore, notes, depth));
+                errors, hostSemaphore, notesOfUrl, depth));
 
         phaser.arriveAndAwaitAdvance();
 
@@ -267,7 +266,3 @@ public class WebCrawler implements Crawler {
         System.out.println("Exception's message: " + e.getMessage());
     }
 }
-
-/*
- May be use ForkJoinPool.
- */
