@@ -266,3 +266,7 @@ public class WebCrawler implements Crawler {
         System.out.println("Exception's message: " + e.getMessage());
     }
 }
+
+
+// TODO: не ждать лимита на хост. Решение: сделать отдельную очередь на каждый хост.
+// Когда если возможность скачать, мы либо создаем новую таску, либо закидываем ее в очередь.

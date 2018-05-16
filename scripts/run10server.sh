@@ -20,5 +20,4 @@ java -cp \
         `../lib/jsoup-1.8.1.jar:`
         `../lib/quickcheck-0.6.jar:`
         `../out \
-    info.kgeorgiy.java.advanced.hello.Tester server-i18n ru.ifmo.rain.golovin.nets.HelloUDPServer
-
+    info.kgeorgiy.java.advanced.hello.Tester server-i18n ru.ifmo.rain.golovin.nets.HelloUDPServer $1
