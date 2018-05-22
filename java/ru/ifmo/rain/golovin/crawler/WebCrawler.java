@@ -106,7 +106,7 @@ public class WebCrawler implements Crawler {
                 if (document != null)
                         dataQueue.add(new DataWrapper(url));
 
-            } catch (InterruptedException e) {
+            } catch (InterruptedException egnored) {
 
             } catch (MalformedURLException e) {
                 errors.put(url, e);
