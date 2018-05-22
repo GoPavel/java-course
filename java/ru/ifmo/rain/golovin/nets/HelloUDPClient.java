@@ -68,6 +68,7 @@ public class HelloUDPClient implements HelloClient {
         public void run() {
             int indexRequest = 0;
             while(!Thread.currentThread().isInterrupted() && indexRequest < requests) {
+                System.out.println("begin cycle");
                 String request = prefix + number + "_" + indexRequest;
                 byte [] buf = request.getBytes(StandardCharsets.UTF_8);
                 DatagramPacket requestPacket = new DatagramPacket(buf, 0, buf.length, address);
@@ -91,6 +92,7 @@ public class HelloUDPClient implements HelloClient {
                 if (response.contains(request) && !response.equals(request)) {
                     indexRequest++;
                 }
+                System.out.println("end cycle");
             }
         }
     }
