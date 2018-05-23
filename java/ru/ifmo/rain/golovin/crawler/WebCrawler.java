@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -18,8 +19,9 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Phaser;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class WebCrawler implements Crawler {
@@ -50,69 +52,76 @@ public class WebCrawler implements Crawler {
         }
     }
 
+    private static String getHost(String url, ConcurrentMap<String, IOException> errors) {
+        try {
+            return URLUtils.getHost(url);
+        } catch (MalformedURLException e) {
+            errors.put(url, e);
+            return null;
+        }
+    }
+
+
     private class TaskLoading implements Runnable {
-        private final String url;
         private final Phaser phaser;
         private final BlockingQueue<DataWrapper> dataQueue;
         private final ConcurrentMap<String, IOException> errors;
-        private final ConcurrentMap<String, Semaphore> hostSemaphore;
-        private final ConcurrentSkipListSet<String> notesOfUrl; // TODO replace class to interface
-        private int depth;
+        private final ConcurrentSkipListSet<String> notesOfUrl;
+        private final int depth;
+        private final ConcurrentMap<String, AtomicInteger> counterPerHost;
+        private final ConcurrentMap<String, BlockingQueue<String>> tasksPerHost;
+        private String host;
 
         private TaskLoading(String url,
                             Phaser phaser,
                             BlockingQueue<DataWrapper> dataQueue,
                             ConcurrentMap<String, IOException> errors,
-                            ConcurrentMap<String, Semaphore> hostSemaphore,
                             ConcurrentSkipListSet<String> notesOfUrl,
-                            int depth) {
-            this.url = url;
+                            int depth,
+                            ConcurrentMap<String, AtomicInteger> counterPerHost,
+                            ConcurrentMap<String, BlockingQueue<String>> tasksPerHost) {
             this.phaser = phaser;
             phaser.register();
             this.dataQueue = dataQueue;
             this.errors = errors;
-            this.hostSemaphore = hostSemaphore;
             this.notesOfUrl = notesOfUrl;
             this.depth = depth;
+            this.counterPerHost = counterPerHost;
+            this.tasksPerHost = tasksPerHost;
+            this.host = getHost(url, errors);
         }
-
 
         @Override
         public void run() {
             try {
-                String host = URLUtils.getHost(url);
+                if (host != null) {
+                    BlockingQueue<String> queueTasks = tasksPerHost.getOrDefault(host, null);
+                    while (!queueTasks.isEmpty()) {
+                        String url = queueTasks.remove();
 
-                if (hostSemaphore.get(host) == null) {
-                    hostSemaphore.putIfAbsent(host, new Semaphore(perHost));
-                }
-                Semaphore semaphore = hostSemaphore.get(host);
+                        Document document = null;
+                        try {
+                            document = downloader.download(url);
+                        } catch (IOException e) {
+                            errors.put(url, e);
+                        }
 
-                Document document = null;
-                try {
-                    semaphore.acquire();
-                    try {
-                        document = downloader.download(url);
-                    } catch (IOException e) {
-                        errors.put(url, e);
+                        if (depth > 1 && document != null) {
+                            extractPool.submit(new TaskExtractLink(url, phaser, dataQueue,
+                                    errors, notesOfUrl, depth, document, counterPerHost, tasksPerHost));
+                        }
+                        if (document != null)
+                            dataQueue.add(new DataWrapper(url));
+
                     }
-                } finally {
-                    semaphore.release();
                 }
+            } catch (NoSuchElementException e) {
 
-                if (depth > 1 && document != null) {
-                    extractPool.submit(new TaskExtractLink(url, phaser, dataQueue,
-                            hostSemaphore, errors, notesOfUrl, depth, document));
-                }
-                if (document != null)
-                        dataQueue.add(new DataWrapper(url));
-
-            } catch (InterruptedException egnored) {
-
-            } catch (MalformedURLException e) {
-                errors.put(url, e);
             } finally {
                 phaser.arrive();
+                counterPerHost.get(host).decrementAndGet();
             }
+
         }
     }
 
@@ -120,29 +129,32 @@ public class WebCrawler implements Crawler {
         private final String url;
         private final Phaser phaser;
         private final BlockingQueue<DataWrapper> dataQueue;
-        private final ConcurrentMap<String, Semaphore> hostSemaphore;
         private final ConcurrentMap<String, IOException> errors;
         private final ConcurrentSkipListSet<String> notesOfUrl;
         private int depth;
         private final Document document;
+        private final ConcurrentMap<String, AtomicInteger> counterPerHost;
+        private final ConcurrentMap<String, BlockingQueue<String>> tasksPerHost;
 
         public TaskExtractLink(String url,
                                Phaser phaser,
                                BlockingQueue<DataWrapper> dataQueue,
-                               ConcurrentMap<String, Semaphore> hostSemaphore,
                                ConcurrentMap<String, IOException> errors,
                                ConcurrentSkipListSet<String> notesOfUrl,
                                int depth,
-                               Document document) {
+                               Document document,
+                               ConcurrentMap<String, AtomicInteger> counterPerHost,
+                               ConcurrentMap<String, BlockingQueue<String>> tasksPerHost) {
             this.url = url;
             this.phaser = phaser;
             phaser.register();
             this.dataQueue = dataQueue;
-            this.hostSemaphore = hostSemaphore;
             this.errors = errors;
             this.notesOfUrl = notesOfUrl;
             this.depth = depth;
             this.document = document;
+            this.counterPerHost = counterPerHost;
+            this.tasksPerHost = tasksPerHost;
         }
 
         @Override
@@ -152,16 +164,45 @@ public class WebCrawler implements Crawler {
 
                 if (urls != null) {
                     for (String url : urls) {
-                        if (notesOfUrl.add(url)) {
-                            downloadPool.submit(new TaskLoading(url, phaser, dataQueue,
-                                    errors, hostSemaphore, notesOfUrl, depth - 1));
-                        }
+                        addDownloadTask(url, phaser, dataQueue, errors, notesOfUrl, depth, counterPerHost, tasksPerHost);
                     }
                 }
-            }catch (IOException e) {
+            } catch (IOException e) {
                 errors.put(url, e);
-            } finally   {
+            } finally {
                 phaser.arrive();
+            }
+        }
+    }
+
+    private void addDownloadTask(String url,
+                                 Phaser phaser,
+                                 BlockingQueue<DataWrapper> dataQueue,
+                                 ConcurrentMap<String, IOException> errors,
+                                 ConcurrentSkipListSet<String> notesOfUrl,
+                                 int depth,
+                                 ConcurrentMap<String, AtomicInteger> counterPerHost,
+                                 ConcurrentMap<String, BlockingQueue<String>> tasksPerHost) {
+        if (notesOfUrl.add(url)) {
+
+            String host = getHost(url, errors);
+
+            if (host != null) {
+                tasksPerHost.putIfAbsent(host, new LinkedBlockingQueue<>());
+                counterPerHost.putIfAbsent(host, new AtomicInteger(0));
+
+                BlockingQueue<String> tasks = tasksPerHost.get(host);
+                AtomicInteger counter = counterPerHost.get(host);
+
+                tasks.add(url);
+                if (counter.addAndGet(1) - 1 >= perHost) {
+                    // not download
+                    counter.decrementAndGet();
+                } else {
+                    // download
+                    downloadPool.submit(new TaskLoading(url, phaser, dataQueue,
+                            errors, notesOfUrl, depth - 1, counterPerHost, tasksPerHost));
+                }
             }
         }
     }
@@ -184,14 +225,14 @@ public class WebCrawler implements Crawler {
     public Result download(String url, int depth) {
         BlockingQueue<DataWrapper> result = new LinkedBlockingDeque<>(); // for result
         ConcurrentMap<String, IOException> errors = new ConcurrentHashMap<>();
-        ConcurrentMap<String, Semaphore> hostSemaphore = new ConcurrentHashMap<>(); // check per host limit
         ConcurrentSkipListSet<String> notesOfUrl = new ConcurrentSkipListSet<>(); // for unique check
+
+        ConcurrentMap<String, AtomicInteger> counterPerHost = new ConcurrentHashMap<>();
+        ConcurrentMap<String, BlockingQueue<String>> tasksPerHost = new ConcurrentHashMap<>();
 
         Phaser phaser = new Phaser(1);
 
-        notesOfUrl.add(url);
-        downloadPool.submit(new TaskLoading(url, phaser, result,
-                errors, hostSemaphore, notesOfUrl, depth));
+        addDownloadTask(url, phaser, result, errors, notesOfUrl, depth + 1, counterPerHost, tasksPerHost);
 
         phaser.arriveAndAwaitAdvance();
 
@@ -266,7 +307,3 @@ public class WebCrawler implements Crawler {
         System.out.println("Exception's message: " + e.getMessage());
     }
 }
-
-
-// TODO: не ждать лимита на хост. Решение: сделать отдельную очередь на каждый хост.
-// Когда если возможность скачать, мы либо создаем новую таску, либо закидываем ее в очередь.
