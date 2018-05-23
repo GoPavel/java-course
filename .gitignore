@@ -8,3 +8,5 @@ java/ru/ifmo/rain/golovin/student/test.java
 *.class
 javaDocJarImplementor/*
 jar-files/*
+books.txt
+tempPages/
