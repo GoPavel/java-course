@@ -1,7 +1,6 @@
 package ru.ifmo.rain.golovin.nets;
 
 import info.kgeorgiy.java.advanced.hello.HelloClient;
-import info.kgeorgiy.java.advanced.hello.Util;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -14,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 public class HelloUDPClient implements HelloClient {
 
@@ -46,13 +46,11 @@ public class HelloUDPClient implements HelloClient {
         private int number;
         private final String prefix;
         private final InetSocketAddress address;
-        private final int port;
 
         public Worker(int requests, int number, String prefix, int port, InetSocketAddress address) {
             this.requests = requests;
             this.number = number;
             this.prefix = prefix;
-            this.port = port;
             this.address = address;
         }
 
@@ -61,19 +59,22 @@ public class HelloUDPClient implements HelloClient {
             int indexRequest = 0;
             String request = null;
             DatagramPacket requestPacket = null;
-            byte[] buf = null;
 
             try (DatagramSocket socket = new DatagramSocket()) {
                 socket.setSoTimeout(TIMEOUT);
+                byte[] bufRequest;
+                byte[] bufResponse = new byte[socket.getReceiveBufferSize()];
+                ;
 
                 while (!Thread.currentThread().isInterrupted() && indexRequest < requests) {
                     if (request == null) {
                         request = prefix + number + "_" + indexRequest;
-                        buf = request.getBytes(Util.CHARSET);
-                        requestPacket = new DatagramPacket(buf, 0, buf.length, address);
+                        bufRequest = request.getBytes(StandardCharsets.UTF_8);
+                        requestPacket = new DatagramPacket(bufRequest, 0, bufRequest.length, address);
                     }
 
                     try {
+//                        System.err.println("??? " + request);
                         socket.send(requestPacket);
                     } catch (IOException e) {
                         error(e, "Can't send packet.");
@@ -83,13 +84,13 @@ public class HelloUDPClient implements HelloClient {
                     }
 
                     try {
-                        buf = new byte[socket.getReceiveBufferSize()];
+                        DatagramPacket responsePacket = new DatagramPacket(bufResponse, bufResponse.length);
 
-                        DatagramPacket responsePacket = new DatagramPacket(buf, buf.length);
                         socket.receive(responsePacket);
 
-                        String response = new String(responsePacket.getData(), responsePacket.getOffset(), responsePacket.getLength(), Util.CHARSET);
-                        if (response.contains(request) && !response.equals(request)) {
+                        String response = new String(responsePacket.getData(), responsePacket.getOffset(), responsePacket.getLength(), StandardCharsets.UTF_8);
+//                        System.err.println("!!! " + response);
+                        if (response.matches(".*" + Pattern.quote(request) + "(|\\p{Space}.*)")) {
                             System.out.println(response);
                             request = null;
                             ++indexRequest;
@@ -100,7 +101,6 @@ public class HelloUDPClient implements HelloClient {
                             continue;
                         else return;
                     }
-//                System.out.println("end cycle");
                 }
 
             } catch (SocketException e) {
@@ -118,21 +118,22 @@ public class HelloUDPClient implements HelloClient {
 
     /**
      * Run client.
+     *
      * @param args :
-     * <ul>
-     *     <li>имя или ip-адрес компьютера, на котором запущен сервер</li>
-     *     <li>номер порта, на который отсылать запросы</li>
-     *     <li>префикс запросов (строка)</li>
-     *     <li>число параллельных потоков запросов</li>
-     *     <li>число запросов в каждом потоке</li>
-     * </ul>
+     *             <ul>
+     *             <li>имя или ip-адрес компьютера, на котором запущен сервер</li>
+     *             <li>номер порта, на который отсылать запросы</li>
+     *             <li>префикс запросов (строка)</li>
+     *             <li>число параллельных потоков запросов</li>
+     *             <li>число запросов в каждом потоке</li>
+     *             </ul>
      */
     static void main(String[] args) {
         if (args == null || args.length != 5) {
             System.out.println("Expected five arguments.");
             return;
         }
-        if(Arrays.stream(args).anyMatch(Predicate.isEqual(null))) {
+        if (Arrays.stream(args).anyMatch(Predicate.isEqual(null))) {
             System.out.println("Expected non null argument.");
             return;
         }
@@ -148,7 +149,6 @@ public class HelloUDPClient implements HelloClient {
         } catch (NumberFormatException e) {
             System.out.println("Incorrect integer arguments");
         }
-
 
     }
 }

@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -98,8 +99,8 @@ public class HelloUDPServer implements HelloServer {
         @Override
         public void run() {
             try {
-                String msg = "Hello, " + new String(Arrays.copyOfRange(receivePacket.getData(), 0, receivePacket.getLength()), Util.CHARSET);
-                byte[] sendBuffer = msg.getBytes(Util.CHARSET);
+                String msg = "Hello, " + new String(receivePacket.getData(), 0, receivePacket.getLength(), StandardCharsets.UTF_8);
+                byte[] sendBuffer = msg.getBytes(StandardCharsets.UTF_8);
                 DatagramPacket sendPacket = new DatagramPacket(sendBuffer, sendBuffer.length, receivePacket.getSocketAddress());
                 socket.send(sendPacket);
             } catch (IOException e) {
@@ -114,6 +115,7 @@ public class HelloUDPServer implements HelloServer {
 
     @Override
     public void close() {
+        // TODO add waitting thread
         socket.close();
         listenThread.shutdownNow();
         threadPool.shutdownNow();
