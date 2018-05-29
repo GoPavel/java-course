@@ -119,6 +119,10 @@ public class HelloUDPServer implements HelloServer {
         socket.close();
         listenThread.shutdownNow();
         threadPool.shutdownNow();
+        try {
+            listenThread.awaitTermination(1, TimeUnit.SECONDS);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     private static void error(Exception e, String message) {
