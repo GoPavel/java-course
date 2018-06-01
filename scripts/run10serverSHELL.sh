@@ -1,4 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+# execure from java-course/scripts
+
 
 rm ../out -rf
 mkdir ../out 2> /dev/null

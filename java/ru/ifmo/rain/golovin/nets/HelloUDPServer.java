@@ -39,13 +39,15 @@ public class HelloUDPServer implements HelloServer {
             int countOfThread = Integer.parseInt(args[1]);
             try(HelloUDPServer server = new HelloUDPServer()) {
                 server.start(numberOfPort, countOfThread);
-                while(true) { }
+                Thread.sleep(10000);
+            } catch (InterruptedException ignored) {
             }
         }
     }
 
     @Override
     public void start(int port, int countOfThread) {
+        System.out.println("Start");
         threadPool = new ThreadPoolExecutor(countOfThread + 1, countOfThread + 1, 0, TimeUnit.MINUTES,
                 new ArrayBlockingQueue<>(1000), new ThreadPoolExecutor.DiscardPolicy());
         listenThread = Executors.newSingleThreadExecutor();
@@ -70,19 +72,24 @@ public class HelloUDPServer implements HelloServer {
 
         @Override
         public void run() {
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
                     byte[] receiveBuffer = new byte[socket.getReceiveBufferSize()];
                     DatagramPacket receivePacket = new DatagramPacket(receiveBuffer, receiveBuffer.length);
-                    socket.receive(receivePacket);
-                    threadPool.submit(new Sender(socket, receivePacket));
-                } catch (IOException e) {
-                    if (socket.isClosed()) {
-                        return;
+                    try {
+                        socket.receive(receivePacket);
+                        threadPool.submit(new Sender(socket, receivePacket));
+                    } catch (IOException e) {
+                        if (socket.isClosed()) {
+                            return;
+                        }
+                        error(e, "When receive packet from port:");
                     }
-                    error(e, "When receive packet from port:");
                 }
+            } catch (SocketException e) {
+
             }
+
         }
     }
 
@@ -115,7 +122,6 @@ public class HelloUDPServer implements HelloServer {
 
     @Override
     public void close() {
-        // TODO add waitting thread
         socket.close();
         listenThread.shutdownNow();
         threadPool.shutdownNow();
@@ -123,6 +129,7 @@ public class HelloUDPServer implements HelloServer {
             listenThread.awaitTermination(1, TimeUnit.SECONDS);
         } catch (InterruptedException ignored) {
         }
+        System.out.println("close");
     }
 
     private static void error(Exception e, String message) {

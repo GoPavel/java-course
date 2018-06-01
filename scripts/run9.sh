@@ -23,5 +23,3 @@ java -cp \
     `../lib/quickcheck-0.6.jar:`
     `../out \
     info.kgeorgiy.java.advanced.crawler.Tester hard ru.ifmo.rain.golovin.crawler.WebCrawler $1
-
-# TODO 333
